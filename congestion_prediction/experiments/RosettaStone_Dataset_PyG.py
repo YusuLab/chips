@@ -24,29 +24,26 @@ train_designs = [
     'superblue5',
     'superblue6',
     'superblue7',
-    'superblue8',
     'superblue9',
     'superblue10',
     'superblue11',
     'superblue12',
-    'superblue13',
     'superblue14',
-    'superblue15'
+    'superblue15',
+    'superblue16',
 ]
 
 valid_designs = [
     'adaptec4',
     'bigblue3',
     'newblue6',
-    'superblue16',
-    'superblue17'
+    'superblue18',
 ]
 
 test_designs = [
     'adaptec5',
     'bigblue4',
     'newblue7',
-    'superblue18',
     'superblue19'
 ]
 
@@ -68,6 +65,20 @@ class RosettaStone_Dataset_PyG(Dataset):
             self.designs = None
 
         print('Number of designs:', len(self.designs))
+
+        for design in self.designs:
+            conn_fn = self.data_dir + '/' + design + '/' + design + '_connectivity.npz'
+            fson_fn = self.data_dir + '/' + design + '/' + design + '.json.gz'
+
+            # Connectivity
+            print('Reading', conn_fn)
+            conn = np.load(conn_fn)
+            row = conn['row']
+            col = conn['col']
+            data = conn['data']
+            shape = conn['shape']
+
+        print('Done data pre-processing for the', self.split, 'set')
 
     def len(self):
         return len(self.designs)
