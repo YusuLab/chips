@@ -77,6 +77,16 @@ class RosettaStone_Dataset_PyG(Dataset):
             col = conn['col']
             data = conn['data']
             shape = conn['shape']
+            
+            print(max(row) + 1)
+
+            # PyG dataset
+            # sample = Data()
+            # sample.__num_nodes__ = x.size(0)
+        # sample.x = x
+        # sample.y = y
+        # sample.edge_index = self.edge_index.long()
+
 
         print('Done data pre-processing for the', self.split, 'set')
 
