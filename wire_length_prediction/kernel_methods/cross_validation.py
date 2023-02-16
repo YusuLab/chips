@@ -13,6 +13,7 @@ import sklearn.gaussian_process as gp
 # Metrics
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_percentage_error
 
 # Fix random seed for reproducibility
 random.seed(123456789)
@@ -114,6 +115,9 @@ mae_results = [[] for idx in range(num_methods)]
 # Results for Root Mean Square Error (RMSE)
 rmse_results = [[] for idx in range(num_methods)]
 
+# Results for Mean Absolute Percentage Error (MAPE)
+mape_results = [[] for idx in range(num_methods)]
+
 # Cross-validation
 for fold in range(num_folds):
     print('Fold', fold, '----------------------------------')
@@ -162,10 +166,12 @@ for fold in range(num_folds):
         mae = mean_absolute_error(y_test, y_hat)
         mse = mean_squared_error(y_test, y_hat)
         rmse = math.sqrt(mse)
+        mape = mean_absolute_percentage_error(y_test, y_hat)
 
         # Save the result
         mae_results[idx].append(mae)
         rmse_results[idx].append(rmse)
+        mape_results[idx].append(mape)
 
         print('Done', method_name)
 
@@ -194,5 +200,10 @@ for idx in range(num_methods):
     rmse_mean = np.mean(array)
     rmse_std = np.std(array)
     print('* RMSE =', rmse_mean, '+/-', rmse_std)
+
+    array = np.array(mape_results[idx]) # Average relative error
+    mape_mean = np.mean(array)
+    mape_std = np.std(array)
+    print('* MAPE =', mape_mean, '+/-', mape_std)
 
 print('Done')
