@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import random
+import csv
 
 # Methods
 from sklearn.linear_model import LinearRegression
@@ -30,12 +31,62 @@ y_mean = np.mean(y)
 y_std = np.std(y)
 y = (y - y_mean) / y_std
 
-# Create indices for cross-validation
+# Standard way of creating indices for cross-validation
+'''
 num_folds = 10
 fold_indices = [[] for fold in range(num_folds)]
 for idx in range(num_samples):
     fold = random.randint(0, num_folds - 1)
     fold_indices[fold].append(idx)
+'''
+
+# Read the netlist information
+netlist_info = []
+with open('df_clean.csv', newline = '') as csv_file:
+    reader = csv.reader(csv_file, delimiter = ',', quotechar = '|')
+    for row in reader:
+        netlist_info.append(row[2])
+netlist_info = netlist_info[1:]
+assert len(netlist_info) == num_samples
+
+netlist_names = []
+for idx in range(num_samples):
+    parts = netlist_info[idx].split('_')
+    name = '_'.join(parts[0:5])
+    netlist_info[idx] = name
+    netlist_names.append(name)
+
+netlist_names = list(set(netlist_names))
+netlist_names.sort()
+num_netlists = len(netlist_names)
+
+print('Netlists:', netlist_names)
+print('Number of netlists:', num_netlists)
+
+# Create indices for cross-validation
+num_folds = 4
+fold_netlists = [[] for fold in range(num_folds)]
+for idx in range(num_netlists):
+    fold = random.randint(0, num_folds - 1)
+    fold_netlists[fold].append(netlist_names[idx])
+
+fold_indices = [[] for fold in range(num_folds)]
+for fold in range(num_folds):
+    for name in fold_netlists[fold]:
+        fold_indices[fold] += [idx for idx in range(num_samples) if netlist_info[idx] == name]
+    fold_indices[fold].sort()
+
+count_netlists = 0
+count_samples = 0
+for fold in range(num_folds):
+    print('Fold', fold, ':')
+    print('- Number of netlists:', len(fold_netlists[fold]))
+    print('- Number of samples:', len(fold_indices[fold]))
+    count_netlists += len(fold_netlists[fold])
+    count_samples += len(fold_indices[fold])
+
+assert count_netlists == num_netlists
+assert count_samples == num_samples
 
 # Methods we want to try
 method_names = [
@@ -79,7 +130,7 @@ for fold in range(num_folds):
             model = Ridge(alpha = 10.0)
         elif method_name == 'Linear-SVM':
             # You will need to search for the optimal hyper-parameters
-            model = SVR(kernel = 'linear', C = 1.0, epsilon = 5)
+            model = SVR(kernel = 'linear', C = 10.0, epsilon = 2)
         elif method_name == 'RBF-SVM':
             # You will need to search for the optimal hyper-parameters
             model = SVR(kernel = 'rbf', C = 10.0)
