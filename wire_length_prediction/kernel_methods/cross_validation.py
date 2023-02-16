@@ -2,6 +2,7 @@ import numpy as np
 import math
 import random
 import csv
+import pickle
 
 # Methods
 from sklearn.linear_model import LinearRegression
@@ -88,6 +89,15 @@ for fold in range(num_folds):
 assert count_netlists == num_netlists
 assert count_samples == num_samples
 
+# Save folds to file
+dictionary = {
+    "netlists": fold_netlists,
+    "indices": fold_indices
+}
+f = open(str(num_folds) + '_folds.pkl', 'wb')
+pickle.dump(dictionary, f)
+f.close()
+
 # Methods we want to try
 method_names = [
     'LinearRegression', # Linear Regression
@@ -136,8 +146,8 @@ for fold in range(num_folds):
             model = SVR(kernel = 'rbf', C = 10.0)
         elif method_name == 'Gaussian-Processes':
             # You will need to search for the optimal hyper-parameter
-            kernel = gp.kernels.ConstantKernel(1.0, (1e-1, 1e3)) * gp.kernels.RBF(10.0, (1e-3, 1e3))
-            model = gp.GaussianProcessRegressor(kernel = kernel, alpha = 0.1, normalize_y = True)
+            kernel = gp.kernels.ConstantKernel(1.0, (1e-1, 1e3)) * gp.kernels.RBF(1.0, (1e-3, 1e3))
+            model = gp.GaussianProcessRegressor(kernel = kernel, alpha = 0.01, normalize_y = True)
         else:
             print('Unsupported method!')
             assert False
