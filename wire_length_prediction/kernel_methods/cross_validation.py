@@ -15,6 +15,10 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics import mean_absolute_percentage_error
 
+# Mean Absolute Relative Error
+def mean_absolute_relative_error(y_truth, y_pred):
+    return np.mean(np.abs(y_truth - y_pred) / np.abs(y_truth))
+
 # Fix random seed for reproducibility
 random.seed(123456789)
 
@@ -118,6 +122,9 @@ rmse_results = [[] for idx in range(num_methods)]
 # Results for Mean Absolute Percentage Error (MAPE)
 mape_results = [[] for idx in range(num_methods)]
 
+# Results for Mean Absolute Relative Error (MARE)
+mare_results = [[] for idx in range(num_methods)]
+
 # Cross-validation
 for fold in range(num_folds):
     print('Fold', fold, '----------------------------------')
@@ -167,11 +174,13 @@ for fold in range(num_folds):
         mse = mean_squared_error(y_test, y_hat)
         rmse = math.sqrt(mse)
         mape = mean_absolute_percentage_error(y_test, y_hat)
+        mare = mean_absolute_relative_error(y_test, y_hat)
 
         # Save the result
         mae_results[idx].append(mae)
         rmse_results[idx].append(rmse)
         mape_results[idx].append(mape)
+        mare_results[idx].append(mare)
 
         print('Done', method_name)
 
@@ -205,5 +214,10 @@ for idx in range(num_methods):
     mape_mean = np.mean(array)
     mape_std = np.std(array)
     print('* MAPE =', mape_mean, '+/-', mape_std)
+
+    array = np.array(mare_results[idx]) # Average relative error
+    mare_mean = np.mean(array)
+    mare_std = np.std(array)
+    print('* MARE =', mare_mean, '+/-', mare_std)
 
 print('Done')
