@@ -173,8 +173,8 @@ for fold in range(num_folds):
         mae = mean_absolute_error(y_test, y_hat)
         mse = mean_squared_error(y_test, y_hat)
         rmse = math.sqrt(mse)
-        mape = mean_absolute_percentage_error(y_test, y_hat)
-        mare = mean_absolute_relative_error(y_test, y_hat)
+        mape = mean_absolute_percentage_error(y_test * y_std + y_mean, y_hat * y_std + y_mean)
+        mare = mean_absolute_relative_error(y_test * y_std + y_mean, y_hat * y_std + y_mean)
 
         # Save the result
         mae_results[idx].append(mae)
