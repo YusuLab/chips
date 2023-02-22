@@ -2,7 +2,11 @@ import numpy as np
 import gzip
 import json
 
-file_name = 'RosettaStone-GraphData-2023-01-21/adaptec1/adaptec1.json.gz'
+# Old data
+file_name = 'NCSU-DigIC-GraphData-2022-10-15/counter/counter.json.gz'
+
+# RosettaStone
+# file_name = 'RosettaStone-GraphData-2023-01-21/adaptec1/adaptec1.json.gz'
 
 with gzip.open(file_name, 'r') as fin:
     data = json.load(fin)
