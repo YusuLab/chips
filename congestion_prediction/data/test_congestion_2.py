@@ -41,8 +41,8 @@ def getGRCIndex(x, y, xbl, ybl):
 
 # Design
 # design = 'counter'
-design = 'xbar'
-# design = 'RocketTile'
+# design = 'xbar'
+design = 'RocketTile'
 print('Design:', design)
 
 # Information about instances and nets
@@ -66,6 +66,9 @@ congestion_fn = 'NCSU-DigIC-GraphData-2022-10-15/' + design + '/' + design + '_c
 # Load congestion data file
 congestion_data = np.load(congestion_fn)
 
+congestion_data_demand = congestion_data['demand']
+congestion_data_capacity = congestion_data['capacity']
+
 num_layers = len(list(congestion_data['layerList']))
 print('Number of layers:', num_layers)
 print('Layers:', list(congestion_data['layerList']))
@@ -87,13 +90,13 @@ for layer in list(congestion_data['layerList']):
     ret = binned_statistic_2d(xloc_list, yloc_list, None, 'count', bins = [xbl[1:], ybl[1:]], expand_binnumbers = True)
     print('Time for binned statistics:', time.time() - t)
 
-    i_list = [ret.binnumber[0, idx] for idx in range(num_instances)]
-    j_list = [ret.binnumber[1, idx] for idx in range(num_instances)]
+    i_list = np.array([ret.binnumber[0, idx] - 1 for idx in range(num_instances)])
+    j_list = np.array([ret.binnumber[1, idx] - 1 for idx in range(num_instances)])
 
     # Get demand and capacity
     t = time.time()
-    demand_list = [congestion_data['demand'][lyr][i_list[idx]][j_list[idx]] for idx in range(num_instances)]
-    capacity_list = [congestion_data['capacity'][lyr][i_list[idx]][j_list[idx]] for idx in range(num_instances)]
+    demand_list = congestion_data_demand[lyr, i_list, j_list].flatten()
+    capacity_list = congestion_data_capacity[lyr, i_list, j_list].flatten()
     print('Time to get demand and capacity:', time.time() - t)
 
     demand_list = np.array(demand_list)
