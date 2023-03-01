@@ -1,9 +1,10 @@
 import numpy as np
 import gzip
 import json
+from scipy.stats import binned_statistic_2d
+import time
 
 # Slow getGRCIndex
-'''
 def getGRCIndex(x, y, xbl, ybl):
     j = 0
     for b in xbl[1:]:
@@ -16,7 +17,6 @@ def getGRCIndex(x, y, xbl, ybl):
             break
         i += 1
     return i, j
-'''
 
 # Fast getGRCIndex
 def binary_search(key, array):
@@ -76,37 +76,38 @@ for layer in list(congestion_data['layerList']):
     ybl = congestion_data['yBoundaryList']
     xbl = congestion_data['xBoundaryList']
 
-    count_congestions = 0
-    sum_diff = 0
-    sum_demand = 0
-    sum_capacity = 0
+    # Get placements info
+    t = time.time()
+    xloc_list = [instances[idx]['xloc'] for idx in range(num_instances)]
+    yloc_list = [instances[idx]['yloc'] for idx in range(num_instances)]
+    print('Time for getting placement info:', time.time() - t)
 
-    for idx in range(num_instances):
-        xloc = instances[idx]['xloc']
-        yloc = instances[idx]['yloc']
-        i, j = getGRCIndex(xloc, yloc, xbl, ybl)
+    # Binned statistics 2D
+    t = time.time()
+    ret = binned_statistic_2d(xloc_list, yloc_list, None, 'count', bins = [xbl[1:], ybl[1:]], expand_binnumbers = True)
+    print('Time for binned statistics:', time.time() - t)
 
-        demand = congestion_data['demand'][lyr][i][j]
-        capacity = congestion_data['capacity'][lyr][i][j]
+    i_list = [ret.binnumber[0, idx] for idx in range(num_instances)]
+    j_list = [ret.binnumber[1, idx] for idx in range(num_instances)]
 
-        # Statistics
-        sum_diff += (capacity - demand)
-        sum_demand += demand
-        sum_capacity += capacity
+    # Get demand and capacity
+    t = time.time()
+    demand_list = [congestion_data['demand'][lyr][i_list[idx]][j_list[idx]] for idx in range(num_instances)]
+    capacity_list = [congestion_data['capacity'][lyr][i_list[idx]][j_list[idx]] for idx in range(num_instances)]
+    print('Time to get demand and capacity:', time.time() - t)
 
-        # If demand is bigger than capacity then increse the number of congestions by 1
-        if demand > capacity:
-            count_congestions += 1
+    demand_list = np.array(demand_list)
+    capacity_list = np.array(capacity_list)
 
-        if (idx + 1) % 1000 == 0:
-            print('Done scanning for', idx + 1, 'instances')
-
-    average_diff = sum_diff / num_instances
-    average_demand = sum_demand / num_instances
-    average_capacity = sum_capacity / num_instances
-    
+    average_demand = np.mean(demand_list)
+    average_capacity = np.mean(capacity_list)
+    average_diff = np.mean(capacity_list - demand_list)
+    count_congestions = np.sum(demand_list > capacity_list)
+ 
+    print()
     print('Number of demand > capacity:', count_congestions)
     print('Average capacity - demand:', average_diff)
     print('Average demand:', average_demand)
     print('Average capacity:', average_capacity)
+
 print('Done')
