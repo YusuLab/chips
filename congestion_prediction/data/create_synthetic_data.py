@@ -205,6 +205,12 @@ for sample in range(num_samples):
 
     assert len(X) == count
     assert len(Y) == count
+
+    minX = min(X)
+    maxX = max(X)
+    minY = min(Y)
+    maxY = max(Y)
+
     X = np.expand_dims(np.array(X), axis = 1)
     Y = np.expand_dims(np.array(Y), axis = 1)
     X = (X - x1) / (x2 - x1)
@@ -218,6 +224,10 @@ for sample in range(num_samples):
     dictionary = {
         'num_instances': count,
         'num_nets': num_nets,
+        'minX': minX,
+        'maxX': maxX,
+        'minY': minY,
+        'maxY': maxY,
         'instance_features': instance_features
     }
     fn = data_dir + '/' + str(sample) + '.node_features.pkl'
