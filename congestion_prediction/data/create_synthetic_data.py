@@ -112,12 +112,14 @@ sample_index = np.array(sample_index)
 # Create connection for the synthetic dataset
 instance_idx = [[] for sample in range(num_samples)]
 net_idx = [[] for sample in range(num_samples)]
+edge_attr = [[] for sample in range(num_samples)]
 
 num_edges = connection_data['row'].shape[0]
 print('Number of hyper-edges:', num_edges)
 
 row = connection_data['row']
 col = connection_data['col']
+edge = connection_data['data']
 
 mark = np.zeros([num_edges])
 for e in range(num_edges):
@@ -126,14 +128,17 @@ for e in range(num_edges):
 for sample in range(num_samples):
     instance_idx[sample] = row[mark == sample]
     net_idx[sample] = col[mark == sample]
+    edge_attr[sample] = edge[mark == sample]
 
 assert num_edges == np.sum(np.array([len(instance_idx[sample]) for sample in range(num_samples)]))
 assert num_edges == np.sum(np.array([len(net_idx[sample]) for sample in range(num_samples)]))
+assert num_edges == np.sum(np.array([len(edge_attr[sample]) for sample in range(num_samples)]))
 
 for sample in range(num_samples):
     dictionary = {
         'instance_idx': instance_idx[sample],
-        'net_idx': net_idx[sample]
+        'net_idx': net_idx[sample],
+        'edge_attr': edge_attr[sample]
     }
     fn = data_dir + '/' + str(sample) + '.bipartite.pkl'
     f = open(fn, "wb")
