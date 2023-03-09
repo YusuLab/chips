@@ -134,9 +134,13 @@ assert num_edges == np.sum(np.array([len(instance_idx[sample]) for sample in ran
 assert num_edges == np.sum(np.array([len(net_idx[sample]) for sample in range(num_samples)]))
 assert num_edges == np.sum(np.array([len(edge_attr[sample]) for sample in range(num_samples)]))
 
+def standardize_array(arr):
+    unique = np.unique(arr).tolist()
+    return np.array([unique.index(arr[i]) for i in range(arr.shape[0])])
+
 for sample in range(num_samples):
     dictionary = {
-        'instance_idx': instance_idx[sample],
+        'instance_idx': instance_idx[sample], # standardize_array(instance_idx[sample]),
         'net_idx': net_idx[sample],
         'edge_attr': edge_attr[sample]
     }
