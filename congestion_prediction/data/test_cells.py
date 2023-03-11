@@ -9,5 +9,7 @@ with gzip.open(file_name, 'r') as fin:
 
 print(len(data))
 print(data[0])
+print(data[1])
+print(data[2])
 
 print('Done')
