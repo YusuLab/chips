@@ -28,11 +28,13 @@ assert num_designs == len(num_variants_list)
 # Generate all names
 sample_names = []
 corresponding_design = []
+corresponding_variant = []
 for idx in range(num_designs):
     for variant in range(num_variants_list[idx]):
         sample_name = raw_data_dir + designs_list[idx] + '/' + str(variant + 1) + '/'
         sample_names.append(sample_name)
         corresponding_design.append(designs_list[idx])
+        corresponding_variant.append(variant + 1)
 
 # Synthetic data
 N = len(sample_names)
