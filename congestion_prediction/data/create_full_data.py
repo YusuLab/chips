@@ -38,6 +38,83 @@ for idx in range(num_designs):
 N = len(sample_names)
 data_dir = '2023-03-06_data/'
 
+# +--------------------+
+# | Global information |
+# +--------------------+
+
+# Read the csv file
+with open(raw_data_dir + '/settings.csv') as f:
+    lines = f.readlines()
+
+lines = lines[1:]
+for line in lines:
+    words = line.strip().split(',')
+    dictionary = {
+        'design': words[0],
+        'variant': int(words[1]),
+        'core_utilization': float(words[2]),
+        'max_routing_layer': words[3],
+        'clk_per': int(words[4]),
+        'clk_uncertainty': float(words[5]),
+        'flow_stage': words[6],
+        'hstrap_layer': words[7],
+        'hstrap_width': float(words[8]),
+        'hstrap_pitch': float(words[9]),
+        'vstrap_layer': words[10],
+        'vstrap_width': float(words[11]),
+        'vstrap_pitch': float(words[12])
+    }
+
+    sample_idx = -1
+    for idx in range(N):
+        if dictionary['design'] == corresponding_design[idx] and dictionary['variant'] == corresponding_variant[idx]:
+            sample_idx = idx
+            break
+
+    fn = data_dir + str(sample_idx) + '.global_information.pkl'
+    f = open(fn, "wb")
+    pickle.dump(dictionary, f)
+    f.close()
+    print('Save file', fn)
+
+# +-------------------------+
+# | Information about cells |
+# +-------------------------+
+
+cells_fn = raw_data_dir + 'cells.json.gz'
+with gzip.open(cells_fn, 'r') as fin:
+    cell_data = json.load(fin)
+
+widths = []
+heights = []
+for idx in range(len(cell_data)):
+    width = cell_data[idx]['width']
+    height = cell_data[idx]['height']
+    widths.append(width)
+    heights.append(height)
+
+widths = np.array(widths)
+heights = np.array(heights)
+
+min_cell_width = np.min(widths)
+max_cell_width = np.max(widths)
+min_cell_height = np.min(heights)
+max_cell_height = np.max(heights)
+
+print('min cell width:', min_cell_width)
+print('max cell width:', max_cell_width)
+print('mean cell width:', np.mean(widths))
+print('std cell width:', np.std(widths))
+print()
+print('min cell height:', min_cell_height)
+print('max cell height:', max_cell_height)
+print('mean cell height:', np.mean(heights))
+print('std cell height:', np.std(heights))
+
+widths = (widths - min_cell_width) / (max_cell_width - min_cell_width)
+heights = (heights - min_cell_height) / (max_cell_height - min_cell_height)
+print('Done processing cell sizes')
+
 # For each sample
 for sample in range(N):
     
@@ -70,6 +147,8 @@ for sample in range(N):
     xloc_list = [instances[idx]['xloc'] for idx in range(num_instances)]
     yloc_list = [instances[idx]['yloc'] for idx in range(num_instances)]
     cell = [instances[idx]['cell'] for idx in range(num_instances)]
+    cell_width = [widths[cell[idx]] for idx in range(num_instances)]
+    cell_height = [heights[cell[idx]] for idx in range(num_instances)]
     orient = [instances[idx]['orient'] for idx in range(num_instances)]
     
     x_min = min(xloc_list)
@@ -88,9 +167,11 @@ for sample in range(N):
     Y = (Y - y_min) / (y_max - y_min)
 
     cell = np.expand_dims(np.array(cell), axis = 1)
+    cell_width = np.expand_dims(np.array(cell_width), axis = 1)
+    cell_height = np.expand_dims(np.array(cell_height), axis = 1)
     orient = np.expand_dims(np.array(orient), axis = 1)
 
-    instance_features = np.concatenate((X, Y, cell, orient), axis = 1)
+    instance_features = np.concatenate((X, Y, cell, cell_width, cell_height, orient), axis = 1)
 
     dictionary = {
         'num_instances': num_instances,
@@ -99,6 +180,10 @@ for sample in range(N):
         'x_max': x_max,
         'y_min': y_min,
         'y_max': y_max,
+        'min_cell_width': min_cell_width,
+        'max_cell_width': max_cell_width,
+        'min_cell_height': min_cell_height,
+        'max_cell_height': max_cell_height,
         'instance_features': instance_features,
         'sample_name': sample_name,
         'folder': folder,
