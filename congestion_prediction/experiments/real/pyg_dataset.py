@@ -67,7 +67,7 @@ class pyg_dataset(Dataset):
             net_idx = torch.Tensor(dictionary['net_idx']) + num_instances
             net_idx = net_idx.unsqueeze(dim = 1).long()
 
-            edge_attr = torch.Tensor(dictionary['edge_attr']).unsqueeze(dim = 1).long()
+            edge_attr = torch.Tensor(dictionary['edge_attr']).unsqueeze(dim = 1).float()
             edge_index = torch.cat((instance_idx, net_idx), dim = 1)
             
             # PyG data

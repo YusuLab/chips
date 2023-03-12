@@ -1,40 +1,58 @@
+import argparse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam, Adagrad
+from torch_geometric.utils import degree
+import pickle
 from torch import optim
+
+# PyTorch data loader
+# from torch.utils.data import DataLoader
+
+# PyTorch geometric data loader
+from torch_geometric.loader import DataLoader
+from pyg_dataset import pyg_dataset
 
 import numpy as np
 import os
 import time
 import argparse
 import scipy
-import pickle
-
-# Dataset
-from torch_geometric.loader import DataLoader
-from pyg_dataset import pyg_dataset
+from tqdm import tqdm
 
 # Model
 import sys
 sys.path.insert(1, '../../models/')
-from mlp_model import MLP
+from gnn_hetero import GNN # Heterogeneous GNN
+
+# Create a configuration for position encodings (including SignNet)
+from yacs.config import CfgNode as CN
+from posenc_config import set_cfg_posenc
+
+# For Laplacian position encoding
+from scipy.sparse import csgraph
 
 # Fix number of threads
 torch.set_num_threads(4)
 
 def _parse_args():
     parser = argparse.ArgumentParser(description = 'Supervised learning')
-    parser.add_argument('--dir', '-dir', type = str, default = '.', help = 'Directory')
-    parser.add_argument('--data_dir', '-data_dir', type = str, default = '.', help = 'Directory that contains the raw datasets')
+    parser.add_argument('--dir', '-dir', type = str, default = '.', help = 'Directory to save results')
+    parser.add_argument('--data_dir', '-data_dir', type = str, default = '.', help = 'Directory that contains all the raw datasets')
     parser.add_argument('--name', '-name', type = str, default = 'NAME', help = 'Name')
     parser.add_argument('--num_epoch', '-num_epoch', type = int, default = 2048, help = 'Number of epochs')
     parser.add_argument('--batch_size', '-batch_size', type = int, default = 20, help = 'Batch size')
     parser.add_argument('--learning_rate', '-learning_rate', type = float, default = 0.001, help = 'Initial learning rate')
     parser.add_argument('--seed', '-s', type = int, default = 123456789, help = 'Random seed')
+    parser.add_argument('--n_layers', '-n_layers', type = int, default = 3, help = 'Number of layers of message passing')
     parser.add_argument('--hidden_dim', '-hidden_dim', type = int, default = 32, help = 'Hidden dimension')
-    parser.add_argument('--fold', '-fold', type = int, default = 0, help = 'Fold index in cross-validation')
     parser.add_argument('--test_mode', '-test_mode', type = int, default = 0, help = 'Test mode')
+    parser.add_argument('--pe', '-pe', type = str, default = 'none', help = 'Position encoding')
+    parser.add_argument('--pos_dim', '-pos_dim', type = int, default = 0, help = 'Dimension of position encoding')
+    parser.add_argument('--virtual_node', '-virtual_node', type = int, default = 0, help = 'Virtual node')
+    parser.add_argument('--gnn_type', '-gnn_type', type = str, default = 'gin', help = 'GNN type')
+    parser.add_argument('--fold', '-fold', type = int, default = 0, help = 'Fold index in cross-validation')
     parser.add_argument('--device', '-device', type = str, default = 'cpu', help = 'cuda/cpu')
     args = parser.parse_args()
     return args
@@ -61,6 +79,22 @@ np.random.seed(args.seed)
 # os.environ['CUDA_VISIBLE_DEVICES'] = ""
 device = args.device
 print(device)
+
+# Dataset
+print('Create data loaders')
+pe = args.pe
+pos_dim = args.pos_dim
+
+# For SignNet position encoding
+config = None
+use_signnet = False
+if pe == 'signnet':
+    use_signnet = True
+    config = CN()
+    config = set_cfg_posenc(config)
+    config.posenc_SignNet.model = 'DeepSet'
+    config.posenc_SignNet.post_layers = 2
+    config.posenc_SignNet.dim_pe = pos_dim
 
 # Dataset
 print(args.data_dir)
@@ -97,12 +131,41 @@ print('Number of edge features:', edge_dim)
 print('Number of outputs:', num_outputs)
 
 # Init model and optimizer
-model = MLP(input_dim = node_dim, hidden_dim = args.hidden_dim, output_dim = num_outputs).to(device = device)
+if args.virtual_node == 1:
+    virtual_node = True
+else:
+    virtual_node = False
+gnn_type = args.gnn_type
+
+print('GNN type:', gnn_type)
+print('Virtual node:', virtual_node)
+
+if gnn_type == 'pna':
+    aggregators = ['mean', 'min', 'max', 'std']
+    scalers = ['identity', 'amplification', 'attenuation']
+
+    print('Computing the in-degree histogram')
+    deg = torch.zeros(10, dtype = torch.long)
+    for batch_idx, data in enumerate(train_dataloader):
+        d = degree(data.edge_index[1], num_nodes = data.num_nodes, dtype = torch.long)
+        deg += torch.bincount(d, minlength = deg.numel())
+    print('Done computing the in-degree histogram')
+
+    model = GNN(gnn_type = gnn_type, num_tasks = num_outputs, virtual_node = virtual_node, num_layer = args.n_layers, emb_dim = args.hidden_dim,
+            aggregators = aggregators, scalers = scalers, deg = deg, edge_dim = edge_dim, 
+            use_signnet = use_signnet, node_dim = node_dim, cfg_posenc = config,
+            device = device).to(device)
+else:
+    model = GNN(gnn_type = gnn_type, num_tasks = num_outputs, virtual_node = virtual_node, num_layer = args.n_layers, emb_dim = args.hidden_dim,
+            use_signnet = use_signnet, node_dim = node_dim, edge_dim = edge_dim, cfg_posenc = config,
+            device = device).to(device)
+
 optimizer = Adagrad(model.parameters(), lr = args.learning_rate)
 
 num_parameters = sum(param.numel() for param in model.parameters() if param.requires_grad)
 print('Number of learnable parameters:', num_parameters)
 LOG.write('Number of learnable parameters: ' + str(num_parameters) + '\n')
+print('Done with model creation')
 
 # Test mode
 if args.test_mode == 1:
@@ -125,35 +188,41 @@ for epoch in range(num_epoch):
     nBatch = 0
     sum_error = 0.0
     num_samples = 0
-    
-    for batch_idx, data in enumerate(train_dataloader):
-        node_feat = data.x.to(device = device)
-        targets = data.y.to(device = device)
 
-        # Model
-        predict = model(node_feat)
-        predict = predict[: targets.size(0), :]
+    for batch_idx, data in enumerate(train_dataloader):
+        data = data.to(device = device)
+        target = data.y
+
+        if use_signnet == True:
+            data.x = data.x.type(torch.FloatTensor).to(device = device)
+
+        if gnn_type == 'pna':
+            data.edge_attr = data.edge_attr.type(torch.FloatTensor).to(device = device)
+
+        predict = model(data)
+        predict = predict[: target.size(0), :]
 
         optimizer.zero_grad()
-        
-        # Mean squared error loss
-        loss = F.mse_loss(predict.view(-1), targets.view(-1), reduction = 'mean')
 
-        sum_error += torch.sum(torch.abs(predict.view(-1) - targets.view(-1))).detach().cpu().numpy()
-        num_samples += node_feat.size(0)
-        
+        # Mean squared error loss
+        loss = F.mse_loss(predict.view(-1), target.view(-1), reduction = 'mean')
+ 
         loss.backward()
         optimizer.step()
         
         total_loss += loss.item()
         nBatch += 1
+
+        sum_error += torch.sum(torch.abs(predict.view(-1) - target.view(-1))).detach().cpu().numpy()
+        num_samples += predict.size(0)
+
         if batch_idx % 1 == 0:
             print('Batch', batch_idx, '/', len(train_dataloader),': Loss =', loss.item())
             LOG.write('Batch ' + str(batch_idx) + '/' + str(len(train_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
-    train_mae = sum_error / num_samples
+    train_mae = sum_error / (num_samples * num_outputs)
     avg_loss = total_loss / nBatch
-    
+
     print('Train average loss:', avg_loss)
     LOG.write('Train average loss: ' + str(avg_loss) + '\n')
     print('Train MAE:', train_mae)
@@ -171,28 +240,32 @@ for epoch in range(num_epoch):
         sum_error = 0.0
         num_samples = 0
         for batch_idx, data in enumerate(valid_dataloader):
-            node_feat = data.x.to(device = device)
-            targets = data.y.to(device = device)
+            data = data.to(device = device)
+            target = data.y
 
-            # Model
-            predict = model(node_feat)
-            predict = predict[: targets.size(0), :]
+            if use_signnet == True:
+                data.x = data.x.type(torch.FloatTensor).to(device = device)
+
+            if gnn_type == 'pna':
+                data.edge_attr = data.edge_attr.type(torch.FloatTensor).to(device = device)
+
+            predict = model(data)
+            predict = predict[: target.size(0), :]
 
             # Mean squared error loss
-            loss = F.mse_loss(predict.view(-1), targets.view(-1), reduction = 'mean')
+            loss = F.mse_loss(predict.view(-1), target.view(-1), reduction = 'mean')
 
             total_loss += loss.item()
             nBatch += 1
 
-            # Mean average error
-            sum_error += torch.sum(torch.abs(predict.view(-1) - targets.view(-1))).detach().cpu().numpy()
-            num_samples += node_feat.size(0)
+            sum_error += torch.sum(torch.abs(predict.view(-1) - target.view(-1))).detach().cpu().numpy()
+            num_samples += predict.size(0)
              
             if batch_idx % 1 == 0:
                 print('Valid Batch', batch_idx, '/', len(valid_dataloader),': Loss =', loss.item())
                 LOG.write('Valid Batch ' + str(batch_idx) + '/' + str(len(valid_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
-    valid_mae = sum_error / num_samples
+    valid_mae = sum_error / (num_samples * num_outputs)
     avg_loss = total_loss / nBatch
 
     print('Valid average loss:', avg_loss)
@@ -231,32 +304,36 @@ model.eval()
 total_loss = 0.0
 nBatch = 0
 
-# For visualization
 with torch.no_grad():
     sum_error = 0.0
     num_samples = 0
     for batch_idx, data in enumerate(test_dataloader):
-        node_feat = data.x.to(device = device)
-        targets = data.y.to(device = device)
+        data = data.to(device = device)
+        target = data.y
 
-        # Model
-        predict = model(node_feat)
-        predict = predict[: targets.size(0), :]
+        if use_signnet == True:
+            data.x = data.x.type(torch.FloatTensor).to(device = device)
 
+        if gnn_type == 'pna':
+            data.edge_attr = data.edge_attr.type(torch.FloatTensor).to(device = device)
+
+        predict = model(data)
+        predict = predict[: target.size(0), :]
+        
         # Mean squared error loss
-        loss = F.mse_loss(predict.view(-1), targets.view(-1), reduction = 'mean')
+        loss = F.mse_loss(predict.view(-1), target.view(-1), reduction = 'mean')
 
         total_loss += loss.item()
         nBatch += 1
 
-        sum_error += torch.sum(torch.abs(predict.view(-1) - targets.view(-1))).detach().cpu().numpy()
-        num_samples += node_feat.size(0)
+        sum_error += torch.sum(torch.abs(predict.view(-1) - target.view(-1))).detach().cpu().numpy()
+        num_samples += predict.size(0)
 
         if batch_idx % 1 == 0:
             print('Test Batch', batch_idx, '/', len(test_dataloader),': Loss =', loss.item())
             LOG.write('Test Batch ' + str(batch_idx) + '/' + str(len(test_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
-test_mae = sum_error / num_samples 
+test_mae = sum_error / (num_samples * num_outputs)
 avg_loss = total_loss / nBatch
 
 print('--------------------------------------')

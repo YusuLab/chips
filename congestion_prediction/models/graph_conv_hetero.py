@@ -151,10 +151,7 @@ class GNN_node(torch.nn.Module):
 
         ### computing input node embedding
         if self.use_signnet == False:
-            batch_size = x.size(0) // self.num_nodes
-            x = torch.reshape(x, (batch_size, self.num_nodes, self.node_dim))
             x = self.node_encoder(x)
-            x = torch.reshape(x, (batch_size * self.num_nodes, self.emb_dim))
             h_list = [x]
         else:
             batched_data = compute_posenc_stats(batched_data, ['SignNet'], True, self.cfg_posenc)
