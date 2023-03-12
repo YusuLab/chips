@@ -75,7 +75,7 @@ class pyg_dataset(Dataset):
             example.__num_nodes__ = x.size(0)
             example.x = x
             example.y = y
-            example.edge_index = edge_index
+            example.edge_index = torch.transpose(edge_index, 0, 1)
             example.edge_attr = edge_attr
 
             self.data.append(example)
