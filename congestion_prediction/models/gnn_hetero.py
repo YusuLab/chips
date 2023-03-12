@@ -13,7 +13,7 @@ from torch_scatter import scatter_mean
 class GNN(torch.nn.Module):
 
     def __init__(self, num_tasks, num_layer = 5, emb_dim = 300, 
-                    gnn_type = 'gin', virtual_node = True, residual = True, JK = "sum", graph_pooling = "mean",
+                    gnn_type = 'gin', virtual_node = True, residual = True, JK = "concat", graph_pooling = "mean",
                     
                     aggregators = ['mean', 'min', 'max', 'std'], # For PNA
                     scalers = ['identity', 'amplification', 'attenuation'], # For PNA
@@ -63,11 +63,15 @@ class GNN(torch.nn.Module):
                     device = device).to(device = device)
         
         # Final node-level prediction
-        self.fc1 = torch.nn.Linear(emb_dim, 512)
-        self.fc2 = torch.nn.Linear(512, num_tasks)
+        if self.JK == "concat":
+            self.fc1 = torch.nn.Linear((self.num_layer + 1) * emb_dim, 512)
+            self.fc2 = torch.nn.Linear(512, num_tasks)
+        else:
+            self.fc1 = torch.nn.Linear(emb_dim, 512)
+            self.fc2 = torch.nn.Linear(512, num_tasks)
 
     def forward(self, batched_data):
         h_node = self.gnn_node(batched_data)
-        predict = self.fc2(torch.nn.functional.leaky_relu(self.fc1(h_node), negative_slope = 0.1))
+        predict = torch.nn.functional.relu(self.fc2(torch.nn.functional.leaky_relu(self.fc1(h_node), negative_slope = 0.1)))
         return predict
 

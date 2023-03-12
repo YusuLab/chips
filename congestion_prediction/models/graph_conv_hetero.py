@@ -78,7 +78,7 @@ class GNN_node(torch.nn.Module):
     Output:
         node representations
     """
-    def __init__(self, num_layer, emb_dim, JK = "sum", residual = True, gnn_type = 'gin', norm_type = "layer",
+    def __init__(self, num_layer, emb_dim, JK = "concat", residual = True, gnn_type = 'gin', norm_type = "layer",
                         aggregators = ['mean', 'min', 'max', 'std'], # For PNA
                         scalers = ['identity', 'amplification', 'attenuation'], # For PNA
                         deg = None, # For PNA
@@ -114,7 +114,9 @@ class GNN_node(torch.nn.Module):
         self.cfg_posenc = cfg_posenc
         if use_signnet == False:
             self.node_encoder = nn.Sequential(
-                    nn.Linear(node_dim, emb_dim),
+                    nn.Linear(node_dim, 2 * emb_dim),
+                    nn.LeakyReLU(negative_slope = 0.1),
+                    nn.Linear(2 * emb_dim, emb_dim),
                     nn.LeakyReLU(negative_slope = 0.1)
             )
         else:
@@ -183,6 +185,8 @@ class GNN_node(torch.nn.Module):
             node_representation = 0
             for layer in range(self.num_layer + 1):
                 node_representation += h_list[layer]
+        elif self.JK == "concat":
+            node_representation = torch.cat(h_list, dim = 1)
 
         return node_representation
 
@@ -193,7 +197,7 @@ class GNN_node_Virtualnode(torch.nn.Module):
     Output:
         node representations
     """
-    def __init__(self, num_layer, emb_dim, JK = "sum", residual = True, gnn_type = 'gin', norm_type = "layer",
+    def __init__(self, num_layer, emb_dim, JK = "concat", residual = True, gnn_type = 'gin', norm_type = "layer",
                         aggregators = ['mean', 'min', 'max', 'std'], # For PNA
                         scalers = ['identity', 'amplification', 'attenuation'], # For PNA
                         deg = None, # For PNA
@@ -229,7 +233,9 @@ class GNN_node_Virtualnode(torch.nn.Module):
         
         if use_signnet == False:
             self.node_encoder = nn.Sequential(
-                    nn.Linear(node_dim, emb_dim),
+                    nn.Linear(node_dim, 2 * emb_dim),
+                    nn.LeakyReLU(negative_slope = 0.1),
+                    nn.Linear(2 * emb_dim, emb_dim),
                     nn.LeakyReLU(negative_slope = 0.1)
             )
 
@@ -341,6 +347,8 @@ class GNN_node_Virtualnode(torch.nn.Module):
             node_representation = 0
             for layer in range(self.num_layer + 1):
                 node_representation += h_list[layer]
+        elif self.JK == "concat":
+            node_representation = torch.cat(h_list, dim = 1)
 
         return node_representation
 
