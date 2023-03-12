@@ -6,11 +6,11 @@ mkdir $dir
 
 data_dir=../../data/2023-03-06_data/
 
-num_epoch=100
+num_epoch=1000
 batch_size=1
 learning_rate=0.001
 seed=123456789
-n_layers=4
+n_layers=6
 hidden_dim=32
 
 device=cuda

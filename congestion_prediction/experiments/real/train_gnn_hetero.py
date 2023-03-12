@@ -130,6 +130,22 @@ print('Number of node features:', node_dim)
 print('Number of edge features:', edge_dim)
 print('Number of outputs:', num_outputs)
 
+# Statistics
+y = []
+for batch_idx, data in enumerate(train_dataloader):
+    y.append(data.y.detach().numpy())
+y = np.concatenate(y)
+
+y_min = np.min(y)
+y_max = np.max(y)
+y_mean = np.mean(y)
+y_std = np.std(y)
+
+print('y min:', y_min)
+print('y max:', y_max)
+print('y mean:', y_mean)
+print('y std:', y_std)
+
 # Init model and optimizer
 if args.virtual_node == 1:
     virtual_node = True
@@ -191,7 +207,7 @@ for epoch in range(num_epoch):
 
     for batch_idx, data in enumerate(train_dataloader):
         data = data.to(device = device)
-        target = data.y
+        target = (data.y - y_mean) / y_std
 
         if use_signnet == True:
             data.x = data.x.type(torch.FloatTensor).to(device = device)
@@ -216,7 +232,7 @@ for epoch in range(num_epoch):
         sum_error += torch.sum(torch.abs(predict.view(-1) - target.view(-1))).detach().cpu().numpy()
         num_samples += predict.size(0)
 
-        if batch_idx % 1 == 0:
+        if batch_idx % 10 == 0:
             print('Batch', batch_idx, '/', len(train_dataloader),': Loss =', loss.item())
             LOG.write('Batch ' + str(batch_idx) + '/' + str(len(train_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
@@ -227,6 +243,8 @@ for epoch in range(num_epoch):
     LOG.write('Train average loss: ' + str(avg_loss) + '\n')
     print('Train MAE:', train_mae)
     LOG.write('Train MAE: ' + str(train_mae) + '\n')
+    print('Train MAE (original scale):', train_mae * y_std)
+    LOG.write('Train MAE (original scale): ' + str(train_mae * y_std) + '\n')
     print("Train time =", "{:.5f}".format(time.time() - t))
     LOG.write("Train time = " + "{:.5f}".format(time.time() - t) + "\n")
 
@@ -241,7 +259,7 @@ for epoch in range(num_epoch):
         num_samples = 0
         for batch_idx, data in enumerate(valid_dataloader):
             data = data.to(device = device)
-            target = data.y
+            target = (data.y - y_mean) / y_std
 
             if use_signnet == True:
                 data.x = data.x.type(torch.FloatTensor).to(device = device)
@@ -261,7 +279,7 @@ for epoch in range(num_epoch):
             sum_error += torch.sum(torch.abs(predict.view(-1) - target.view(-1))).detach().cpu().numpy()
             num_samples += predict.size(0)
              
-            if batch_idx % 1 == 0:
+            if batch_idx % 10 == 0:
                 print('Valid Batch', batch_idx, '/', len(valid_dataloader),': Loss =', loss.item())
                 LOG.write('Valid Batch ' + str(batch_idx) + '/' + str(len(valid_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
@@ -272,6 +290,8 @@ for epoch in range(num_epoch):
     LOG.write('Valid average loss: ' + str(avg_loss) + '\n')
     print('Valid MAE:', valid_mae)
     LOG.write('Valid MAE: ' + str(valid_mae) + '\n')
+    print('Valid MAE (original scale):', valid_mae * y_std)
+    LOG.write('Valid MAE (original scale): ' + str(valid_mae * y_std) + '\n')
     print("Valid time =", "{:.5f}".format(time.time() - t))
     LOG.write("Valid time = " + "{:.5f}".format(time.time() - t) + "\n")
     
@@ -279,6 +299,8 @@ for epoch in range(num_epoch):
         best_mae = valid_mae
         print('Current best MAE updated:', best_mae)
         LOG.write('Current best MAE updated: ' + str(best_mae) + '\n')
+        print('Current best MAE (original scale) updated:', best_mae * y_std)
+        LOG.write('Current best MAE (original scale) updated: ' + str(best_mae * y_std) + '\n')
         
         torch.save(model.state_dict(), model_name)
         print("Save the best model to " + model_name)
@@ -293,6 +315,8 @@ if args.test_mode == 0:
     LOG.write('--------------------------------------\n')
     print('Best valid MAE:', best_mae)
     LOG.write('Best valid MAE: ' + str(best_mae) + '\n')
+    print('Best valid MAE (original scale):', best_mae * y_std)
+    LOG.write('Best valid MAE (original scale): ' + str(best_mae * y_std) + '\n')
 
 # Load the model with the best validation
 print("Load the trained model at", model_name)
@@ -309,7 +333,7 @@ with torch.no_grad():
     num_samples = 0
     for batch_idx, data in enumerate(test_dataloader):
         data = data.to(device = device)
-        target = data.y
+        target = (data.y - y_mean) / y_std
 
         if use_signnet == True:
             data.x = data.x.type(torch.FloatTensor).to(device = device)
@@ -329,7 +353,7 @@ with torch.no_grad():
         sum_error += torch.sum(torch.abs(predict.view(-1) - target.view(-1))).detach().cpu().numpy()
         num_samples += predict.size(0)
 
-        if batch_idx % 1 == 0:
+        if batch_idx % 10 == 0:
             print('Test Batch', batch_idx, '/', len(test_dataloader),': Loss =', loss.item())
             LOG.write('Test Batch ' + str(batch_idx) + '/' + str(len(test_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
@@ -342,6 +366,8 @@ print('Test average loss:', avg_loss)
 LOG.write('Test average loss: ' + str(avg_loss) + '\n')
 print('Test MAE:', test_mae)
 LOG.write('Test MAE: ' + str(test_mae) + '\n')
+print('Test MAE (original scale):', test_mae * y_std)
+LOG.write('Test MAE (original scale): ' + str(test_mae * y_std) + '\n')
 print("Test time =", "{:.5f}".format(time.time() - t))
 LOG.write("Test time = " + "{:.5f}".format(time.time() - t) + "\n")
 
