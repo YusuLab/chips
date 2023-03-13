@@ -51,6 +51,7 @@ N = len(sample_names)
 data_dir = '2023-03-06_data/'
 
 # Eigendecomposition
+k = 5
 for idx in range(N):
     file_name = data_dir + str(idx) + '.bipartite.pkl'
     f = open(file_name, 'rb')
@@ -82,14 +83,14 @@ for idx in range(N):
 
     # Sparse Scipy - Eigendecomposition
     t = time.time()
-    evals, evects = eigsh(L, k = 20)
+    evals, evects = eigsh(L, k = k)
     print('Computation time:', time.time() - t)
 
     dictionary = {
         'evals': evals,
         'evects': evects
     }
-    fn = data_dir + str(idx) + '.eigen.pkl'
+    fn = data_dir + str(idx) + '.eigen.' + str(k) + '.pkl'
     f = open(fn, "wb")
     pickle.dump(dictionary, f)
     f.close()
