@@ -34,6 +34,8 @@ def _parse_args():
     parser.add_argument('--seed', '-s', type = int, default = 123456789, help = 'Random seed')
     parser.add_argument('--hidden_dim', '-hidden_dim', type = int, default = 32, help = 'Hidden dimension')
     parser.add_argument('--fold', '-fold', type = int, default = 0, help = 'Fold index in cross-validation')
+    parser.add_argument('--load_pe', '-load_pe', type = int, default = 0, help = 'Position encoding')
+    parser.add_argument('--num_eigen', '-num_eigen', type = int, default = 0, help = 'Number of eigenvectors')
     parser.add_argument('--test_mode', '-test_mode', type = int, default = 0, help = 'Test mode')
     parser.add_argument('--device', '-device', type = str, default = 'cpu', help = 'cuda/cpu')
     args = parser.parse_args()
@@ -62,10 +64,17 @@ np.random.seed(args.seed)
 device = args.device
 print(device)
 
+# Position encoding
+load_pe = False
+num_eigen = 0
+if args.load_pe == 1:
+    load_pe = True
+    num_eigen = args.num_eigen
+
 # Dataset
 print(args.data_dir)
-train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train')
-test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test')
+train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', load_pe = load_pe, num_eigen = num_eigen)
+test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', load_pe = load_pe, num_eigen = num_eigen)
 
 # Data loaders
 batch_size = args.batch_size
@@ -95,6 +104,12 @@ for batch_idx, data in enumerate(test_dataloader):
 print('Number of node features:', node_dim)
 print('Number of edge features:', edge_dim)
 print('Number of outputs:', num_outputs)
+
+if load_pe == True:
+    node_dim += num_eigen
+    
+    print('Number of eigenvectors:', num_eigen)
+    print('Number of node features + eigenvectors:', node_dim)
 
 # Init model and optimizer
 model = MLP(input_dim = node_dim, hidden_dim = args.hidden_dim, output_dim = num_outputs).to(device = device)
@@ -127,7 +142,10 @@ for epoch in range(num_epoch):
     num_samples = 0
     
     for batch_idx, data in enumerate(train_dataloader):
-        node_feat = data.x.to(device = device)
+        if load_pe == True:
+            node_feat = torch.cat([data.x, data.evects], dim = 1).to(device = device)
+        else:
+            node_feat = data.x.to(device = device)
         targets = data.y.to(device = device)
 
         # Model
@@ -171,7 +189,10 @@ for epoch in range(num_epoch):
         sum_error = 0.0
         num_samples = 0
         for batch_idx, data in enumerate(valid_dataloader):
-            node_feat = data.x.to(device = device)
+            if load_pe == True:
+                node_feat = torch.cat([data.x, data.evects], dim = 1).to(device = device)
+            else:
+                node_feat = data.x.to(device = device)
             targets = data.y.to(device = device)
 
             # Model
@@ -236,7 +257,10 @@ with torch.no_grad():
     sum_error = 0.0
     num_samples = 0
     for batch_idx, data in enumerate(test_dataloader):
-        node_feat = data.x.to(device = device)
+        if load_pe == True:
+            node_feat = torch.cat([data.x, data.evects], dim = 1).to(device = device)
+        else:
+            node_feat = data.x.to(device = device)
         targets = data.y.to(device = device)
 
         # Model

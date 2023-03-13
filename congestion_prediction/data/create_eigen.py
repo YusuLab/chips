@@ -51,7 +51,7 @@ N = len(sample_names)
 data_dir = '2023-03-06_data/'
 
 # Eigendecomposition
-k = 5
+k = 10
 for idx in range(N):
     file_name = data_dir + str(idx) + '.bipartite.pkl'
     f = open(file_name, 'rb')

@@ -6,7 +6,7 @@ mkdir $dir
 
 data_dir=../../data/2023-03-06_data/
 
-num_epoch=1000
+num_epoch=300
 batch_size=1
 learning_rate=0.001
 seed=123456789

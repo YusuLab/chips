@@ -7,11 +7,15 @@ import numpy as np
 import pickle
 
 class pyg_dataset(Dataset):
-    def __init__(self, data_dir, fold_index, split, total_samples = 32):
+    def __init__(self, data_dir, fold_index, split, load_pe = False, num_eigen = 5, total_samples = 32):
         super().__init__()
         self.data_dir = data_dir
         self.fold_index = fold_index
         self.split = split
+        
+        # Position encoding
+        self.load_pe = load_pe
+        self.num_eigen = num_eigen
 
         # Read cross-validation
         file_name = data_dir + '/6_fold_cross_validation.pkl'
@@ -77,6 +81,16 @@ class pyg_dataset(Dataset):
             example.y = y
             example.edge_index = torch.transpose(edge_index, 0, 1)
             example.edge_attr = edge_attr
+
+            # Load positional encoding
+            if self.load_pe == True:
+                file_name = data_dir + '/' + str(sample) + '.eigen.' + str(self.num_eigen) + '.pkl'
+                f = open(file_name, 'rb')
+                dictionary = pickle.load(f)
+                f.close()
+
+                example.evects = torch.Tensor(dictionary['evects'])
+                example.evals = torch.Tensor(dictionary['evals'])
 
             self.data.append(example)
 
