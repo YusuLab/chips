@@ -6,25 +6,26 @@ mkdir $dir
 
 data_dir=../../data/2023-03-06_data/
 
-num_epoch=300
+num_epoch=100
 batch_size=1
 learning_rate=0.001
 seed=123456789
-n_layers=6
+n_layers=3
 hidden_dim=32
 
+# Device
 device=cuda
-device_idx=0
+device_idx=4
 
 # Position encoding
-pe=none
-pos_dim=5
+pe=lap
+pos_dim=10
 
 # Test mode
 test_mode=0
 
 # GNN type
-gnn_type=gcn
+gnn_type=gin
 
 # Virtual node
 virtual_node=0

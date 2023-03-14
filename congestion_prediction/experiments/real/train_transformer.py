@@ -12,17 +12,14 @@ import time
 import argparse
 import scipy
 
-# Dataset
-import xarray
-from oisstv2_dataset import read_all_raw_data, oisstv2_dataset, create_adj
+# PyTorch geometric data loader
+from torch_geometric.loader import DataLoader
+from pyg_dataset import pyg_dataset
 
 # Model
 import sys
-sys.path.insert(1, '../../models/pytorch/')
+sys.path.insert(1, '../../models/')
 from linear_transformer_model import Linear_Transformer
-
-# For Laplacian position encoding
-from scipy.sparse import csgraph
 
 # Fix number of threads
 torch.set_num_threads(4)
@@ -42,12 +39,9 @@ def _parse_args():
     parser.add_argument('--depth', '-depth', type = int, default = 1, help = 'Depth in Linear Transformer')
     parser.add_argument('--pe_type', '-pe_type', type = str, default = 'none', help = 'Type of position encoding')
     parser.add_argument('--pe_dim', '-pe_dim', type = int, default = 5, help = 'Dimension of position encoding')
-    parser.add_argument('--lon_filter', '-lon_filter', type = int, default = 1, help = 'Longitude filter to reduce size')
-    parser.add_argument('--lat_filter', '-lat_filter', type = int, default = 1, help = 'Latitude filter to reduce size')
-    parser.add_argument('--history_window', '-history_window', type = int, default = 7, help = 'History window')
-    parser.add_argument('--predict_window', '-predict_window', type = int, default = 7, help = 'Predict window')
     parser.add_argument('--test_mode', '-test_mode', type = int, default = 0, help = 'Test mode')
     parser.add_argument('--device', '-device', type = str, default = 'cpu', help = 'cuda/cpu')
+    parser.add_argument('--fold', '-fold', type = int, default = 0, help = 'Fold')
     args = parser.parse_args()
     return args
 
@@ -76,68 +70,74 @@ print(device)
 
 # Dataset
 print(args.data_dir)
-raw_datasets = read_all_raw_data(args.data_dir)
 
-history_window = args.history_window
-predict_window = args.predict_window
-print('History window:', history_window)
-print('Predict window:', predict_window)
+pe_type = args.pe_type
+pe_dim = args.pe_dim
 
-# Create PyTorch dataset
-lon_filter = args.lon_filter
-lat_filter = args.lat_filter
-
-train_dataset = oisstv2_dataset(raw_datasets = raw_datasets, split = 'train', history_window = history_window, predict_window = predict_window, lon_filter = lon_filter, lat_filter = lat_filter)
-valid_dataset = oisstv2_dataset(raw_datasets = raw_datasets, split = 'valid', history_window = history_window, predict_window = predict_window, lon_filter = lon_filter, lat_filter = lat_filter)
-test_dataset = oisstv2_dataset(raw_datasets = raw_datasets, split = 'test', history_window = history_window, predict_window = predict_window, lon_filter = lon_filter, lat_filter = lat_filter)
+if pe_type == 'lap':
+    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', load_pe = True, num_eigen = pe_dim)
+    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', load_pe = True, num_eigen = pe_dim)
+else:
+    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train')
+    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test')
 
 # Data loaders
 batch_size = args.batch_size
 train_dataloader = DataLoader(train_dataset, batch_size, shuffle = True)
-valid_dataloader = DataLoader(valid_dataset, batch_size, shuffle = False)
+valid_dataloader = DataLoader(test_dataset, batch_size, shuffle = False)
 test_dataloader = DataLoader(test_dataset, batch_size, shuffle = False)
 
+print('Number of training examples:', len(train_dataset))
+print('Number of testing examples:', len(test_dataset))
+
 for batch_idx, data in enumerate(train_dataloader):
-    print(data['inputs'].size())
-    print(data['targets'].size())
-
-    num_nodes = data['inputs'].size(1)
-    node_dim = data['inputs'].size(2)
-    num_outputs = data['targets'].size(2)
+    print(batch_idx)
+    print(data)
+    node_dim = data.x.size(1)
+    edge_dim = data.edge_attr.size(1)
+    num_outputs = data.y.size(1)
     break
-print('Number of nodes:', num_nodes)
-print('Number of input node features:', node_dim)
+
+for batch_idx, data in enumerate(test_dataloader):
+    print(batch_idx)
+    print(data)
+    assert node_dim == data.x.size(1)
+    assert edge_dim == data.edge_attr.size(1)
+    assert num_outputs == data.y.size(1)
+    break
+
+print('Number of node features:', node_dim)
+print('Number of edge features:', edge_dim)
 print('Number of outputs:', num_outputs)
-assert num_outputs == predict_window
 
-# Graph information
-num_longitudes = train_dataset.num_longitudes
-num_latitudes = train_dataset.num_latitudes
-assert num_nodes == num_longitudes * num_latitudes
+if pe_type == 'lap':
+    node_dim += pe_dim
 
-if args.pe_type == 'lap':
-    # Create the adjacency matrix
-    indices, values = create_adj(num_longitudes, num_latitudes)
-    adj = np.zeros((num_nodes, num_nodes))
-    adj[indices[0, :], indices[1, :]] = 1.0
-    print('Adjacency matrix created')
+    print('Number of eigenvectors:', pe_dim)
+    print('Number of node features + eigenvectors:', node_dim)
 
-    # Create the graph Laplacian
-    laplacian = csgraph.laplacian(adj + np.eye(num_nodes), normed = True)
-    print('Graph Laplacian created')
+# Search for the maximum length
+max_size = 0
 
-    # Eigen-decomposition of the graph Laplacian
-    start = time.time()
-    eigenvalues, eigenvectors = scipy.sparse.linalg.eigsh(laplacian, k = args.pe_dim)
-    eigenvectors = torch.Tensor(eigenvectors).to(device = device)
-    finish = time.time()
-    print('Done computing eigenvectors in', finish - start, 'seconds')
+for batch_idx, data in enumerate(train_dataloader):
+    num_nodes = data.x.size(0)
+    if num_nodes > max_size:
+        max_size = num_nodes
 
-    node_dim += args.pe_dim
-    print('Number of input node features with position encoding:', node_dim)
+for batch_idx, data in enumerate(test_dataloader):
+    num_nodes = data.x.size(0)
+    if num_nodes > max_size:
+        max_size = num_nodes
+
+max_seq_len = 1
+while max_seq_len < max_size:
+    max_seq_len *= 2
+
+print('Maximum graph size:', max_size)
+print('Maximum sequence length (for Transformer):', max_seq_len)
 
 # Init model and optimizer
-model = Linear_Transformer(input_dim = node_dim, hidden_dim = args.hidden_dim, output_dim = num_outputs, heads = args.heads, depth = args.depth, n_local_attn_heads = args.local_heads).to(device = device)
+model = Linear_Transformer(input_dim = node_dim, hidden_dim = args.hidden_dim, output_dim = num_outputs, max_seq_len = max_seq_len, heads = args.heads, depth = args.depth, n_local_attn_heads = args.local_heads).to(device = device)
 optimizer = Adagrad(model.parameters(), lr = args.learning_rate)
 
 num_parameters = sum(param.numel() for param in model.parameters() if param.requires_grad)
@@ -167,16 +167,22 @@ for epoch in range(num_epoch):
     num_samples = 0
     
     for batch_idx, data in enumerate(train_dataloader):
-        node_feat = data['inputs'].float().to(device = device)
-        targets = data['targets'].float().to(device = device)
+        data = data.to(device = device)
+        node_feat = data.x
+        targets = data.y
 
         # Position encoding
-        if args.pe_type != 'none':
-            pe = torch.cat([eigenvectors.unsqueeze(dim = 0) for b in range(node_feat.size(0))], dim = 0)
-            node_feat = torch.cat([node_feat, pe], dim = 2)
+        if pe_type == 'lap':
+            node_feat = torch.cat([node_feat, data.evects], dim = 1)
+
+        # Batch dimension
+        node_feat = torch.unsqueeze(node_feat, dim = 0)
+        targets = torch.unsqueeze(targets, dim = 0)
 
         # Model
         predict = model(node_feat)
+        predict = predict[:, : targets.size(0), :]
+
         optimizer.zero_grad()
         
         # Mean squared error loss
@@ -185,7 +191,7 @@ for epoch in range(num_epoch):
         loss = F.mse_loss(predict.view(-1), targets.view(-1), reduction = 'mean')
 
         sum_error += torch.sum(torch.abs(predict.view(-1) - targets.view(-1))).detach().cpu().numpy()
-        num_samples += node_feat.size(0)
+        num_samples += targets.size(1)
         
         loss.backward()
         optimizer.step()
@@ -196,7 +202,7 @@ for epoch in range(num_epoch):
             print('Batch', batch_idx, '/', len(train_dataloader),': Loss =', loss.item())
             LOG.write('Batch ' + str(batch_idx) + '/' + str(len(train_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
-    train_mae = sum_error / (num_samples * num_outputs * num_nodes)
+    train_mae = sum_error / (num_samples * num_outputs)
     avg_loss = total_loss / nBatch
     
     print('Train average loss:', avg_loss)
@@ -215,17 +221,23 @@ for epoch in range(num_epoch):
     with torch.no_grad():
         sum_error = 0.0
         num_samples = 0
+        
         for batch_idx, data in enumerate(valid_dataloader):
-            node_feat = data['inputs'].float().to(device = device)
-            targets = data['targets'].float().to(device = device)
-            
+            data = data.to(device = device)
+            node_feat = data.x
+            targets = data.y
+
             # Position encoding
-            if args.pe_type != 'none':
-                pe = torch.cat([eigenvectors.unsqueeze(dim = 0) for b in range(node_feat.size(0))], dim = 0)
-                node_feat = torch.cat([node_feat, pe], dim = 2)
+            if pe_type == 'lap':
+                node_feat = torch.cat([node_feat, data.evects], dim = 1)
+
+            # Batch dimension
+            node_feat = torch.unsqueeze(node_feat, dim = 0)
+            targets = torch.unsqueeze(targets, dim = 0)
 
             # Model
             predict = model(node_feat)
+            predict = predict[:, : targets.size(0), :]
 
             # Mean squared error loss
             targets = targets.contiguous()
@@ -237,13 +249,13 @@ for epoch in range(num_epoch):
 
             # Mean average error
             sum_error += torch.sum(torch.abs(predict.view(-1) - targets.view(-1))).detach().cpu().numpy()
-            num_samples += node_feat.size(0)
+            num_samples += targets.size(1)
              
             if batch_idx % 100 == 0:
                 print('Valid Batch', batch_idx, '/', len(valid_dataloader),': Loss =', loss.item())
                 LOG.write('Valid Batch ' + str(batch_idx) + '/' + str(len(valid_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
-    valid_mae = sum_error / (num_samples * num_outputs * num_nodes)
+    valid_mae = sum_error / (num_samples * num_outputs)
     avg_loss = total_loss / nBatch
 
     print('Valid average loss:', avg_loss)
@@ -276,66 +288,33 @@ if args.test_mode == 0:
 print("Load the trained model at", model_name)
 model.load_state_dict(torch.load(model_name))
 
-# For visualization
-with torch.no_grad():
-    for batch_idx, data in enumerate(test_dataloader):
-        node_feat = data['inputs'].float().to(device = device)
-        targets = data['targets'].float().to(device = device)
-
-        # Position encoding
-        if args.pe_type != 'none':
-            pe = torch.cat([eigenvectors.unsqueeze(dim = 0) for b in range(node_feat.size(0))], dim = 0)
-            node_feat = torch.cat([node_feat, pe], dim = 2)
-
-        # Model
-        predict = model(node_feat)
-
-        # Mean squared error loss
-        targets = targets.contiguous()
-        predict = predict.contiguous()
-
-        # To save
-        saved_target = torch.reshape(targets[0], (num_longitudes, num_latitudes, predict_window)).detach().cpu().numpy()
-        saved_predict = torch.reshape(predict[0], (num_longitudes, num_latitudes, predict_window)).detach().cpu().numpy()
-        break
-
-np.save('Transformer.predict', saved_predict)
-np.save('Transformer.target', saved_target)
-print('Done saving for visualization')
-
 # Testing
 t = time.time()
 model.eval()
 total_loss = 0.0
 nBatch = 0
 
-# For visualization
-'''
-all_predicts = []
-all_targets = []
-'''
-
 with torch.no_grad():
     sum_error = 0.0
     num_samples = 0
+    
     for batch_idx, data in enumerate(test_dataloader):
-        node_feat = data['inputs'].float().to(device = device)
-        targets = data['targets'].float().to(device = device)
+        data = data.to(device = device)
+        node_feat = data.x
+        targets = data.y
 
         # Position encoding
-        if args.pe_type != 'none':
-            pe = torch.cat([eigenvectors.unsqueeze(dim = 0) for b in range(node_feat.size(0))], dim = 0)
-            node_feat = torch.cat([node_feat, pe], dim = 2)
+        if pe_type == 'lap':
+            node_feat = torch.cat([node_feat, data.evects], dim = 1)
+
+        # Batch dimension
+        node_feat = torch.unsqueeze(node_feat, dim = 0)
+        targets = torch.unsqueeze(targets, dim = 0)
 
         # Model
         predict = model(node_feat)
+        predict = predict[:, : targets.size(0), :]
         
-        # Keep track for visualization
-        '''
-        all_predicts.append(predict.detach().cpu())
-        all_targets.append(targets.detach().cpu())
-        '''
-
         # Mean squared error loss
         targets = targets.contiguous()
         predict = predict.contiguous()
@@ -345,42 +324,14 @@ with torch.no_grad():
         nBatch += 1
 
         sum_error += torch.sum(torch.abs(predict.view(-1) - targets.view(-1))).detach().cpu().numpy()
-        num_samples += node_feat.size(0)
+        num_samples += targets.size(1)
 
         if batch_idx % 100 == 0:
             print('Test Batch', batch_idx, '/', len(test_dataloader),': Loss =', loss.item())
             LOG.write('Test Batch ' + str(batch_idx) + '/' + str(len(test_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
-test_mae = sum_error / (num_samples * num_outputs * num_nodes)
+test_mae = sum_error / (num_samples * num_outputs)
 avg_loss = total_loss / nBatch
-
-# For visualization
-'''
-all_predicts = torch.cat(all_predicts, dim = 0).squeeze(dim = 2)
-all_targets = torch.cat(all_targets, dim = 0).squeeze(dim = 2)
-
-all_predicts = torch.reshape(all_predicts, (all_predicts.size(0), num_longitudes, num_latitudes))
-all_targets = torch.reshape(all_targets, (all_targets.size(0), num_longitudes, num_latitudes))
-
-all_predicts = all_predicts.detach().numpy()
-all_targets = all_targets.detach().numpy()
-
-np.save(args.dir + "/" + args.name + '.test_predicts', all_predicts)
-np.save(args.dir + "/" + args.name + '.test_targets', all_targets)
-'''
-
-# Visualization
-'''
-import matplotlib.pyplot as plt
-n_plots = 10
-fig, axs = plt.subplots(2, n_plots, figsize = (19, 6), sharey = True, sharex = True)
-for i in range(n_plots):
-    predict = all_predicts[i, :, :]
-    target = all_targets[i, :, :]
-    axs[0, i].imshow(predict)
-    axs[1, i].imshow(target)
-fig.savefig(args.dir + "/" + args.name + '.png')
-'''
 
 print('--------------------------------------')
 LOG.write('--------------------------------------\n')

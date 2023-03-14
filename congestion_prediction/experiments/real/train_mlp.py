@@ -158,7 +158,7 @@ for epoch in range(num_epoch):
         loss = F.mse_loss(predict.view(-1), targets.view(-1), reduction = 'mean')
 
         sum_error += torch.sum(torch.abs(predict.view(-1) - targets.view(-1))).detach().cpu().numpy()
-        num_samples += node_feat.size(0)
+        num_samples += predict.size(0)
         
         loss.backward()
         optimizer.step()
@@ -207,7 +207,7 @@ for epoch in range(num_epoch):
 
             # Mean average error
             sum_error += torch.sum(torch.abs(predict.view(-1) - targets.view(-1))).detach().cpu().numpy()
-            num_samples += node_feat.size(0)
+            num_samples += predict.size(0)
              
             if batch_idx % 10 == 0:
                 print('Valid Batch', batch_idx, '/', len(valid_dataloader),': Loss =', loss.item())
@@ -274,7 +274,7 @@ with torch.no_grad():
         nBatch += 1
 
         sum_error += torch.sum(torch.abs(predict.view(-1) - targets.view(-1))).detach().cpu().numpy()
-        num_samples += node_feat.size(0)
+        num_samples += predict.size(0)
 
         if batch_idx % 10 == 0:
             print('Test Batch', batch_idx, '/', len(test_dataloader),': Loss =', loss.item())

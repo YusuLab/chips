@@ -72,6 +72,6 @@ class GNN(torch.nn.Module):
 
     def forward(self, batched_data):
         h_node = self.gnn_node(batched_data)
-        predict = torch.nn.functional.relu(self.fc2(torch.nn.functional.leaky_relu(self.fc1(h_node), negative_slope = 0.1)))
+        predict = self.fc2(torch.nn.functional.leaky_relu(self.fc1(h_node), negative_slope = 0.1))
         return predict
 

@@ -14,7 +14,7 @@ hidden_dim=512
 
 # Position encoding
 load_pe=1
-num_eigen=5
+num_eigen=10
 
 # Device
 device=cuda
