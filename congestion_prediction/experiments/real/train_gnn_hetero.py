@@ -98,8 +98,12 @@ if pe == 'signnet':
 
 # Dataset
 print(args.data_dir)
-train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train')
-test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test')
+if pe == 'lap':
+    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', load_pe = True, num_eigen = pos_dim)
+    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', load_pe = True, num_eigen = pos_dim)
+else:
+    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train')
+    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test')
 
 # Data loaders
 batch_size = args.batch_size
@@ -129,6 +133,12 @@ for batch_idx, data in enumerate(test_dataloader):
 print('Number of node features:', node_dim)
 print('Number of edge features:', edge_dim)
 print('Number of outputs:', num_outputs)
+
+if pe == 'lap':
+    node_dim += pos_dim
+
+    print('Number of eigenvectors:', pos_dim)
+    print('Number of node features + eigenvectors:', node_dim)
 
 # Statistics
 y = []
@@ -209,6 +219,9 @@ for epoch in range(num_epoch):
         data = data.to(device = device)
         target = (data.y - y_mean) / y_std
 
+        if pe == 'lap':
+            data.x = torch.cat([data.x, data.evects], dim = 1)
+
         if use_signnet == True:
             data.x = data.x.type(torch.FloatTensor).to(device = device)
 
@@ -260,6 +273,9 @@ for epoch in range(num_epoch):
         for batch_idx, data in enumerate(valid_dataloader):
             data = data.to(device = device)
             target = (data.y - y_mean) / y_std
+
+            if pe == 'lap':
+                data.x = torch.cat([data.x, data.evects], dim = 1)
 
             if use_signnet == True:
                 data.x = data.x.type(torch.FloatTensor).to(device = device)
@@ -334,6 +350,9 @@ with torch.no_grad():
     for batch_idx, data in enumerate(test_dataloader):
         data = data.to(device = device)
         target = (data.y - y_mean) / y_std
+
+        if pe == 'lap':
+            data.x = torch.cat([data.x, data.evects], dim = 1)
 
         if use_signnet == True:
             data.x = data.x.type(torch.FloatTensor).to(device = device)

@@ -165,7 +165,7 @@ for epoch in range(num_epoch):
         
         total_loss += loss.item()
         nBatch += 1
-        if batch_idx % 1 == 0:
+        if batch_idx % 10 == 0:
             print('Batch', batch_idx, '/', len(train_dataloader),': Loss =', loss.item())
             LOG.write('Batch ' + str(batch_idx) + '/' + str(len(train_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
@@ -209,7 +209,7 @@ for epoch in range(num_epoch):
             sum_error += torch.sum(torch.abs(predict.view(-1) - targets.view(-1))).detach().cpu().numpy()
             num_samples += node_feat.size(0)
              
-            if batch_idx % 1 == 0:
+            if batch_idx % 10 == 0:
                 print('Valid Batch', batch_idx, '/', len(valid_dataloader),': Loss =', loss.item())
                 LOG.write('Valid Batch ' + str(batch_idx) + '/' + str(len(valid_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
@@ -276,7 +276,7 @@ with torch.no_grad():
         sum_error += torch.sum(torch.abs(predict.view(-1) - targets.view(-1))).detach().cpu().numpy()
         num_samples += node_feat.size(0)
 
-        if batch_idx % 1 == 0:
+        if batch_idx % 10 == 0:
             print('Test Batch', batch_idx, '/', len(test_dataloader),': Loss =', loss.item())
             LOG.write('Test Batch ' + str(batch_idx) + '/' + str(len(test_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
