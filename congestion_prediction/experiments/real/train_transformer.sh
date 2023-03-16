@@ -26,7 +26,7 @@ test_mode=0
 pe_dim=10
 
 # Position encoding
-pe_type=lap
+pe_type=none
 
 for fold in 0 1 2 3 4 5
 do
