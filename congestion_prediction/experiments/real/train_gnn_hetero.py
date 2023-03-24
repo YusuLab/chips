@@ -52,6 +52,7 @@ def _parse_args():
     parser.add_argument('--pos_dim', '-pos_dim', type = int, default = 0, help = 'Dimension of position encoding')
     parser.add_argument('--virtual_node', '-virtual_node', type = int, default = 0, help = 'Virtual node')
     parser.add_argument('--gnn_type', '-gnn_type', type = str, default = 'gin', help = 'GNN type')
+    parser.add_argument('--load_global_info', '-load_global_info', type = int, default = 0, help = 'Global information')
     parser.add_argument('--fold', '-fold', type = int, default = 0, help = 'Fold index in cross-validation')
     parser.add_argument('--device', '-device', type = str, default = 'cpu', help = 'cuda/cpu')
     args = parser.parse_args()
@@ -98,12 +99,17 @@ if pe == 'signnet':
 
 # Dataset
 print(args.data_dir)
+
+load_global_info = False
+if args.load_global_info == 1:
+    load_global_info = True
+
 if pe == 'lap':
-    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', load_pe = True, num_eigen = pos_dim)
-    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', load_pe = True, num_eigen = pos_dim)
+    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info)
+    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info)
 else:
-    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train')
-    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test')
+    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', load_global_info = load_global_info)
+    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', load_global_info = load_global_info)
 
 # Data loaders
 batch_size = args.batch_size

@@ -109,7 +109,8 @@ class pyg_dataset(Dataset):
 
                 core_util = dictionary['core_utilization']
                 global_info = torch.Tensor(np.array([core_util, np.sqrt(core_util), core_util ** 2, np.cos(core_util), np.sin(core_util)]))
-                global_info = torch.cat([global_info.unsqueeze(dim = 0) for i in range(example.x.size(0))], dim = 0)
+                num_nodes = example.x.size(0)
+                global_info = torch.cat([global_info.unsqueeze(dim = 0) for i in range(num_nodes)], dim = 0)
 
                 example.x = torch.cat([example.x, global_info], dim = 1)
 
