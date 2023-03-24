@@ -4,7 +4,7 @@ program=train_gnn_hetero
 dir=./$program/
 mkdir $dir
 
-data_dir=../../data/2023-03-06_data/
+data_dir=/data/zluo/chips/congestion_prediction/data/2023-03-06_data/
 
 num_epoch=100
 batch_size=1
@@ -18,14 +18,14 @@ device=cuda
 device_idx=4
 
 # Position encoding
-pe=lap
+pe=none
 pos_dim=10
 
 # Test mode
 test_mode=0
 
 # GNN type
-gnn_type=gin
+gnn_type=gcn
 
 # Virtual node
 virtual_node=0

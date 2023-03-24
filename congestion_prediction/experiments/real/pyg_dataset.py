@@ -7,7 +7,7 @@ import numpy as np
 import pickle
 
 class pyg_dataset(Dataset):
-    def __init__(self, data_dir, fold_index, split, load_pe = False, num_eigen = 5, total_samples = 32):
+    def __init__(self, data_dir, fold_index, split, load_pe = False, num_eigen = 5, load_global_info = False, total_samples = 32):
         super().__init__()
         self.data_dir = data_dir
         self.fold_index = fold_index
@@ -16,6 +16,7 @@ class pyg_dataset(Dataset):
         # Position encoding
         self.load_pe = load_pe
         self.num_eigen = num_eigen
+        self.load_global_info = load_global_info
 
         # Read cross-validation
         file_name = data_dir + '/6_fold_cross_validation.pkl'
@@ -74,6 +75,13 @@ class pyg_dataset(Dataset):
             edge_attr = torch.Tensor(dictionary['edge_attr']).unsqueeze(dim = 1).float()
             edge_index = torch.cat((instance_idx, net_idx), dim = 1)
             
+            '''
+            edge_dir = dictionary['edge_dir']
+            print('Edge dir:', edge_dir.shape)
+            print('Min:', np.min(edge_dir))
+            print('Max:', np.max(edge_dir))
+            '''
+
             # PyG data
             example = Data()
             example.__num_nodes__ = x.size(0)
@@ -91,6 +99,19 @@ class pyg_dataset(Dataset):
 
                 example.evects = torch.Tensor(dictionary['evects'])
                 example.evals = torch.Tensor(dictionary['evals'])
+
+            # Load global information
+            if self.load_global_info == True:
+                file_name = data_dir + '/' + str(sample) + '.global_information.pkl'
+                f = open(file_name, 'rb')
+                dictionary = pickle.load(f)
+                f.close()
+
+                core_util = dictionary['core_utilization']
+                global_info = torch.Tensor(np.array([core_util, np.sqrt(core_util), core_util ** 2, np.cos(core_util), np.sin(core_util)]))
+                global_info = torch.cat([global_info.unsqueeze(dim = 0) for i in range(example.x.size(0))], dim = 0)
+
+                example.x = torch.cat([example.x, global_info], dim = 1)
 
             self.data.append(example)
 
