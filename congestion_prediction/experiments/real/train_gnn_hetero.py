@@ -7,6 +7,9 @@ from torch_geometric.utils import degree
 import pickle
 from torch import optim
 
+# For visualization
+from utils import *
+
 # PyTorch data loader
 # from torch.utils.data import DataLoader
 
@@ -350,6 +353,9 @@ model.eval()
 total_loss = 0.0
 nBatch = 0
 
+y_test = []
+y_hat = []
+
 with torch.no_grad():
     sum_error = 0.0
     num_samples = 0
@@ -371,6 +377,9 @@ with torch.no_grad():
         
         # Mean squared error loss
         loss = F.mse_loss(predict.view(-1), target.view(-1), reduction = 'mean')
+
+        y_test.append(target.view(-1))
+        y_hat.append(predict.view(-1))
 
         total_loss += loss.item()
         nBatch += 1
@@ -395,5 +404,31 @@ print('Test MAE (original scale):', test_mae * y_std)
 LOG.write('Test MAE (original scale): ' + str(test_mae * y_std) + '\n')
 print("Test time =", "{:.5f}".format(time.time() - t))
 LOG.write("Test time = " + "{:.5f}".format(time.time() - t) + "\n")
+
+# Visualiation
+designs_list = [
+    'superblue1',
+    'superblue2',
+    'superblue3',
+    'superblue4',
+    'superblue18',
+    'superblue19'
+]
+
+truth = torch.cat(y_test, dim = 0).cpu().detach().numpy() * y_std
+predict = torch.cat(y_hat, dim = 0).cpu().detach().numpy() * y_std
+
+with open(args.dir + "/" + args.name + ".truth.npy", 'wb') as f:
+    np.save(f, truth)
+
+with open(args.dir + "/" + args.name + ".predict.npy", 'wb') as f:
+    np.save(f, predict)
+
+method_name = args.gnn_type
+design_name = designs_list[args.fold]
+output_name = args.dir + "/" + args.name + ".png"
+
+plot_figure(truth, predict, method_name, design_name, output_name)
+print('Done')
 
 LOG.close()

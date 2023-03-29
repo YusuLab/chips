@@ -23,13 +23,13 @@ device=cuda
 device_idx=1
 
 # Test mode
-test_mode=1
+test_mode=0
 
 # Position encoding dimension if used
 pe_dim=10
 
 # Position encoding
-pe_type=none
+pe_type=lap
 
 for fold in 0 1 2 3 4 5
 do
