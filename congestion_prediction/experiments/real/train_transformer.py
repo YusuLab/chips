@@ -11,6 +11,13 @@ import os
 import time
 import argparse
 import scipy
+import matplotlib.pyplot as plt
+
+# Metrics
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_percentage_error
+from sklearn.metrics import r2_score
 
 # PyTorch geometric data loader
 from torch_geometric.loader import DataLoader
@@ -187,7 +194,7 @@ for epoch in range(num_epoch):
 
         # Model
         predict = model(node_feat)
-        predict = predict[:, : targets.size(0), :]
+        predict = predict[:, : targets.size(1), :]
 
         optimizer.zero_grad()
         
@@ -243,7 +250,7 @@ for epoch in range(num_epoch):
 
             # Model
             predict = model(node_feat)
-            predict = predict[:, : targets.size(0), :]
+            predict = predict[:, : targets.size(1), :]
 
             # Mean squared error loss
             targets = targets.contiguous()
@@ -294,11 +301,47 @@ if args.test_mode == 0:
 print("Load the trained model at", model_name)
 model.load_state_dict(torch.load(model_name))
 
+# +---------------+
+# | Testing Phase |
+# +---------------+
+
+# For visualization
+def scatter_hist(x, y, ax, ax_histx, ax_histy, title = None):
+    # no labels
+    ax_histx.tick_params(axis="x", labelbottom=False)
+    ax_histy.tick_params(axis="y", labelleft=False)
+
+    # the scatter plot:
+    ax.scatter(x, y)
+
+    ax.set_xlabel('Truth')
+    ax.set_ylabel('Predict')
+
+    '''
+    if title is not None:
+        ax.set_title(title, y = -0.01)
+    '''
+
+    # now determine nice limits by hand:
+    binwidth = 4.0
+    xymax = max(np.max(np.abs(x)), np.max(np.abs(y)))
+    lim = (int(xymax/binwidth) + 1) * binwidth
+
+    bins = np.arange(-lim, lim + binwidth, binwidth)
+    ax_histx.hist(x, bins=bins)
+    ax_histy.hist(y, bins=bins, orientation='horizontal')
+
+    if title is not None:
+        ax_histx.set_title(title)
+
 # Testing
 t = time.time()
 model.eval()
 total_loss = 0.0
 nBatch = 0
+
+y_test = []
+y_hat = []
 
 with torch.no_grad():
     sum_error = 0.0
@@ -319,12 +362,15 @@ with torch.no_grad():
 
         # Model
         predict = model(node_feat)
-        predict = predict[:, : targets.size(0), :]
+        predict = predict[:, : targets.size(1), :]
         
         # Mean squared error loss
         targets = targets.contiguous()
         predict = predict.contiguous()
         loss = F.mse_loss(predict.view(-1), targets.view(-1), reduction = 'mean')
+        
+        y_test.append(targets.view(-1))
+        y_hat.append(predict.view(-1))
 
         total_loss += loss.item()
         nBatch += 1
@@ -348,4 +394,44 @@ LOG.write('Test MAE: ' + str(test_mae) + '\n')
 print("Test time =", "{:.5f}".format(time.time() - t))
 LOG.write("Test time = " + "{:.5f}".format(time.time() - t) + "\n")
 
+# Visualiation
+designs_list = [
+    'superblue1',
+    'superblue2',
+    'superblue3',
+    'superblue4',
+    'superblue18',
+    'superblue19'
+]
+
+truth = torch.cat(y_test, dim = 0).cpu().detach().numpy()
+predict = torch.cat(y_hat, dim = 0).cpu().detach().numpy()
+
+r2 = r2_score(truth, predict)
+mae = mean_absolute_error(truth, predict)
+
+method_name = 'LT'
+design_name = designs_list[args.fold]
+title = method_name + ' on ' + design_name + ': MAE = ' + str(round(mae, 2)) + ', R2 = ' + str(round(r2, 2))
+
+fig = plt.figure(figsize = (6, 6))
+gs = fig.add_gridspec(2, 2, width_ratios = (4, 1), height_ratios = (1, 4),
+                      left = 0.1, right = 0.9, bottom = 0.1, top = 0.9,
+                      wspace = 0.05, hspace = 0.05)
+
+ax = fig.add_subplot(gs[1, 0])
+ax_histx = fig.add_subplot(gs[0, 0], sharex = ax)
+ax_histy = fig.add_subplot(gs[1, 1], sharey=ax)
+
+scatter_hist(truth, predict, ax, ax_histx, ax_histy, title = title)
+
+file_name = method_name + '_' + design_name + '.png'
+# plt.xlabel('Truth')
+# plt.ylabel('Predict')
+# plt.title(method_name + ' tests on ' + design_name + ': MAE = ' + str(round(mae, 2)) + ', R2 = ' + str(round(r2, 2)), y = -0.01)
+plt.savefig(file_name, dpi = 200)
+plt.clf()
+
 LOG.close()
+print('Done')
+

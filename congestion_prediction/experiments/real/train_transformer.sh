@@ -23,7 +23,7 @@ device=cuda
 device_idx=1
 
 # Test mode
-test_mode=0
+test_mode=1
 
 # Position encoding dimension if used
 pe_dim=10
