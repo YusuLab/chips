@@ -26,6 +26,9 @@ num_eigen=10
 # Global information
 load_global_info=1
 
+# Persistence diagram & Neighbor list
+load_pd=1
+
 # Device
 device=cuda
 device_idx=1
@@ -37,8 +40,8 @@ for load_pe in 0 1
 do
 for fold in 0 1 2 3 4 5
 do
-name=${program}.target.${target}.num_epoch.${num_epoch}.batch_size.${batch_size}.learning_rate.${learning_rate}.seed.${seed}.hidden_dim.${hidden_dim}.load_pe.${load_pe}.num_eigen.${num_eigen}.load_global_info.${load_global_info}.fold.${fold}
-CUDA_VISIBLE_DEVICES=$device_idx python3 $program.py --target=$target --dir=$dir --data_dir=${data_dir} --name=$name --num_epoch=$num_epoch --batch_size=$batch_size --learning_rate=$learning_rate --seed=$seed --hidden_dim=$hidden_dim --load_pe=${load_pe} --num_eigen=${num_eigen} --load_global_info=$load_global_info --test_mode=$test_mode --fold=$fold --device=$device
+name=${program}.target.${target}.num_epoch.${num_epoch}.batch_size.${batch_size}.learning_rate.${learning_rate}.seed.${seed}.hidden_dim.${hidden_dim}.load_pe.${load_pe}.num_eigen.${num_eigen}.load_global_info.${load_global_info}.load_pd.${load_pd}.fold.${fold}
+CUDA_VISIBLE_DEVICES=$device_idx python3 $program.py --target=$target --dir=$dir --data_dir=${data_dir} --name=$name --num_epoch=$num_epoch --batch_size=$batch_size --learning_rate=$learning_rate --seed=$seed --hidden_dim=$hidden_dim --load_pe=${load_pe} --num_eigen=${num_eigen} --load_global_info=$load_global_info --load_pd=$load_pd --test_mode=$test_mode --fold=$fold --device=$device
 done
 done
 

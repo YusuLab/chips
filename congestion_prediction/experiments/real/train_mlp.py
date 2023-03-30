@@ -40,6 +40,7 @@ def _parse_args():
     parser.add_argument('--fold', '-fold', type = int, default = 0, help = 'Fold index in cross-validation')
     parser.add_argument('--load_pe', '-load_pe', type = int, default = 0, help = 'Position encoding')
     parser.add_argument('--load_global_info', '-load_global_info', type = int, default = 0, help = 'Global information')
+    parser.add_argument('--load_pd', '-load_pd', type = int, default = 0, help = 'Persistence diagram & Neighbor list')
     parser.add_argument('--num_eigen', '-num_eigen', type = int, default = 0, help = 'Number of eigenvectors')
     parser.add_argument('--test_mode', '-test_mode', type = int, default = 0, help = 'Test mode')
     parser.add_argument('--device', '-device', type = str, default = 'cpu', help = 'cuda/cpu')
@@ -81,10 +82,14 @@ load_global_info = False
 if args.load_global_info == 1:
     load_global_info = True
 
+load_pd = False
+if args.load_pd == 1:
+    load_pd = True
+
 # Dataset
 print(args.data_dir)
-train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_pe = load_pe, num_eigen = num_eigen, load_global_info = load_global_info)
-test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_pe = load_pe, num_eigen = num_eigen, load_global_info = load_global_info)
+train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_pe = load_pe, num_eigen = num_eigen, load_global_info = load_global_info, load_pd = load_pd)
+test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_pe = load_pe, num_eigen = num_eigen, load_global_info = load_global_info, load_pd = load_pd)
 
 # Data loaders
 batch_size = args.batch_size

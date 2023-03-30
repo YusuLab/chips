@@ -51,6 +51,7 @@ def _parse_args():
     parser.add_argument('--pe_type', '-pe_type', type = str, default = 'none', help = 'Type of position encoding')
     parser.add_argument('--pe_dim', '-pe_dim', type = int, default = 5, help = 'Dimension of position encoding')
     parser.add_argument('--load_global_info', '-load_global_info', type = int, default = 0, help = 'Global information')
+    parser.add_argument('--load_pd', '-load_pd', type = int, default = 0, help = 'Persistence diagram & Neighbor list')
     parser.add_argument('--test_mode', '-test_mode', type = int, default = 0, help = 'Test mode')
     parser.add_argument('--device', '-device', type = str, default = 'cpu', help = 'cuda/cpu')
     parser.add_argument('--fold', '-fold', type = int, default = 0, help = 'Fold')
@@ -88,15 +89,19 @@ load_global_info = False
 if args.load_global_info == 1:
     load_global_info = True
 
+load_pd = False
+if args.load_pd == 1:
+    load_pd = True
+
 pe_type = args.pe_type
 pe_dim = args.pe_dim
 
 if pe_type == 'lap':
-    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_pe = True, num_eigen = pe_dim, load_global_info = load_global_info)
-    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_pe = True, num_eigen = pe_dim, load_global_info = load_global_info)
+    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_pe = True, num_eigen = pe_dim, load_global_info = load_global_info, load_pd = load_pd)
+    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_pe = True, num_eigen = pe_dim, load_global_info = load_global_info, load_pd = load_pd)
 else:
-    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_global_info = load_global_info)
-    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_global_info = load_global_info)
+    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_global_info = load_global_info, load_pd = load_pd)
+    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_global_info = load_global_info, load_pd = load_pd)
 
 # Data loaders
 batch_size = args.batch_size

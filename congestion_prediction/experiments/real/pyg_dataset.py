@@ -7,7 +7,7 @@ import numpy as np
 import pickle
 
 class pyg_dataset(Dataset):
-    def __init__(self, data_dir, fold_index, split, target, load_pe = False, num_eigen = 5, load_global_info = False, total_samples = 32):
+    def __init__(self, data_dir, fold_index, split, target, load_pe = False, num_eigen = 5, load_global_info = True, load_pd = False, total_samples = 32):
         super().__init__()
         self.data_dir = data_dir
         self.fold_index = fold_index
@@ -20,6 +20,7 @@ class pyg_dataset(Dataset):
         self.load_pe = load_pe
         self.num_eigen = num_eigen
         self.load_global_info = load_global_info
+        self.load_pd = load_pd
 
         # Read cross-validation
         file_name = data_dir + '/6_fold_cross_validation.pkl'
@@ -128,6 +129,24 @@ class pyg_dataset(Dataset):
                 global_info = torch.cat([global_info.unsqueeze(dim = 0) for i in range(num_nodes)], dim = 0)
 
                 example.x = torch.cat([example.x, global_info], dim = 1)
+
+            # Load persistence diagram and neighbor list
+            if self.load_pd == True:
+                file_name = data_dir + '/' + str(sample) + '.node_neighbor_features.pkl'
+                f = open(file_name, 'rb')
+                dictionary = pickle.load(f)
+                f.close()
+
+                pd = torch.Tensor(dictionary['pd'])
+                neighbor_list = torch.Tensor(dictionary['neighbor'])
+
+                assert pd.size(0) == num_instances
+                assert neighbor_list.size(0) == num_instances
+
+                pd = torch.cat([pd, torch.zeros(num_nets, pd.size(1))], dim = 0)
+                neighbor_list = torch.cat([neighbor_list, torch.zeros(num_nets, neighbor_list.size(1))], dim = 0)
+
+                example.x = torch.cat([example.x, pd, neighbor_list], dim = 1)
 
             self.data.append(example)
 
