@@ -1,8 +1,16 @@
 #!/bin/bash
 
 program=train_transformer
-dir=./$program/
-mkdir $dir
+
+#target=demand
+#target=capacity
+target=congestion
+
+mkdir $program
+cd $program
+mkdir $target
+cd ..
+dir=./$program/$target/
 
 data_dir=../../data/2023-03-06_data/
 
@@ -33,7 +41,7 @@ pe_type=lap
 
 for fold in 0 1 2 3 4 5
 do
-name=${program}.num_epoch.${num_epoch}.batch_size.${batch_size}.learning_rate.${learning_rate}.seed.${seed}.hidden_dim.${hidden_dim}.heads.${heads}.local_heads.${local_heads}.depth.${depth}.pe_type.${pe_type}.pe_dim.${pe_dim}.load_global_info.${load_global_info}.fold.${fold}
-CUDA_VISIBLE_DEVICES=$device_idx python3 $program.py --dir=$dir --data_dir=${data_dir} --name=$name --num_epoch=$num_epoch --batch_size=$batch_size --learning_rate=$learning_rate --seed=$seed --hidden_dim=$hidden_dim --heads=$heads --local_heads=$local_heads --depth=$depth --test_mode=$test_mode --pe_type=$pe_type --pe_dim=$pe_dim --load_global_info=$load_global_info --fold=$fold --device=$device
+name=${program}.target.${target}.num_epoch.${num_epoch}.batch_size.${batch_size}.learning_rate.${learning_rate}.seed.${seed}.hidden_dim.${hidden_dim}.heads.${heads}.local_heads.${local_heads}.depth.${depth}.pe_type.${pe_type}.pe_dim.${pe_dim}.load_global_info.${load_global_info}.fold.${fold}
+CUDA_VISIBLE_DEVICES=$device_idx python3 $program.py --target=$target --dir=$dir --data_dir=${data_dir} --name=$name --num_epoch=$num_epoch --batch_size=$batch_size --learning_rate=$learning_rate --seed=$seed --hidden_dim=$hidden_dim --heads=$heads --local_heads=$local_heads --depth=$depth --test_mode=$test_mode --pe_type=$pe_type --pe_dim=$pe_dim --load_global_info=$load_global_info --fold=$fold --device=$device
 done
 

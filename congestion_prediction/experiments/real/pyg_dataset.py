@@ -7,12 +7,15 @@ import numpy as np
 import pickle
 
 class pyg_dataset(Dataset):
-    def __init__(self, data_dir, fold_index, split, load_pe = False, num_eigen = 5, load_global_info = False, total_samples = 32):
+    def __init__(self, data_dir, fold_index, split, target, load_pe = False, num_eigen = 5, load_global_info = False, total_samples = 32):
         super().__init__()
         self.data_dir = data_dir
         self.fold_index = fold_index
         self.split = split
-        
+        self.target = target
+        assert target == 'demand' or target == 'capacity' or target == 'congestion'
+        print('Learning target:', self.target)
+
         # Position encoding
         self.load_pe = load_pe
         self.num_eigen = num_eigen
@@ -59,8 +62,20 @@ class pyg_dataset(Dataset):
             dictionary = pickle.load(f)
             f.close()
 
-            demand = torch.Tensor(dictionary['demand'])
-            y = torch.sum(demand, dim = 1).unsqueeze(dim = 1)
+            if self.target == 'demand':
+                demand = torch.Tensor(dictionary['demand'])
+                y = torch.sum(demand, dim = 1).unsqueeze(dim = 1)
+            elif self.target == 'capacity':
+                capacity = torch.Tensor(dictionary['capacity'])
+                y = torch.sum(capacity, dim = 1).unsqueeze(dim = 1)
+            elif self.target == 'congestion':
+                demand = torch.Tensor(dictionary['demand'])
+                capacity = torch.Tensor(dictionary['capacity'])
+                congestion = demand - capacity
+                y = torch.sum(congestion, dim = 1).unsqueeze(dim = 1)
+            else:
+                print('Unknown learning target')
+                assert False
 
             # Read connection
             file_name = data_dir + '/' + str(sample) + '.bipartite.pkl'

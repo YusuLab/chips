@@ -29,6 +29,7 @@ torch.set_num_threads(4)
 def _parse_args():
     parser = argparse.ArgumentParser(description = 'Supervised learning')
     parser.add_argument('--dir', '-dir', type = str, default = '.', help = 'Directory')
+    parser.add_argument('--target', '-target', type = str, default = 'none', help = 'Learning target')
     parser.add_argument('--data_dir', '-data_dir', type = str, default = '.', help = 'Directory that contains the raw datasets')
     parser.add_argument('--name', '-name', type = str, default = 'NAME', help = 'Name')
     parser.add_argument('--num_epoch', '-num_epoch', type = int, default = 2048, help = 'Number of epochs')
@@ -82,8 +83,8 @@ if args.load_global_info == 1:
 
 # Dataset
 print(args.data_dir)
-train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', load_pe = load_pe, num_eigen = num_eigen, load_global_info = load_global_info)
-test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', load_pe = load_pe, num_eigen = num_eigen, load_global_info = load_global_info)
+train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_pe = load_pe, num_eigen = num_eigen, load_global_info = load_global_info)
+test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_pe = load_pe, num_eigen = num_eigen, load_global_info = load_global_info)
 
 # Data loaders
 batch_size = args.batch_size

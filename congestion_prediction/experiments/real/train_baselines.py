@@ -24,6 +24,11 @@ from sklearn.metrics import r2_score
 def mean_absolute_relative_error(y_truth, y_pred):
     return np.mean(np.abs(y_truth - y_pred) / np.abs(y_truth))
 
+# Learning target
+# target = 'demand'
+# target = 'capacity'
+target = 'congestion'
+
 # Dataset
 data_dir = '../../data/2023-03-06_data/'
 num_samples = 32
@@ -44,13 +49,28 @@ for sample in range(num_samples):
     dictionary = pickle.load(f)
     f.close()
     demand = dictionary['demand']
-    y.append(demand)
+    capacity = dictionary['capacity']
+    congestion = demand - capacity
+
+    # Select the right learning target
+    if target == 'demand':
+        y.append(demand)
+    elif target == 'capacity':
+        y.append(capacity)
+    elif target == 'congestion':
+        y.append(congestion)
+    else:
+        print('Unknown learning target')
+        assert False
+
 y = np.sum(np.concatenate(y, axis = 0), axis = 1)
 y_min = np.min(y)
 y_max = np.max(y)
 y_mean = np.mean(y)
 y_std = np.std(y)
-print('demand statistics: min =', y_min, ', max =', y_max, ', mean =', y_mean, ', std =', y_std)
+
+print('Learning target:', target)
+print('Statistics: min =', y_min, ', max =', y_max, ', mean =', y_mean, ', std =', y_std)
 
 # Folds information
 f = open(data_dir + '/6_fold_cross_validation.pkl', 'rb')
@@ -242,7 +262,8 @@ for idx in range(num_methods):
         predict = dictionary['predict']
         truth = dictionary['truth']
 
-        output_name = method_name + '_' + design_name + '.png'
+        output_name = target + '_' + method_name + '_' + design_name + '.png'
         plot_figure(truth, predict, method_name, design_name, output_name)
+        print('Created figure', output_name)
 
 print('Done')
