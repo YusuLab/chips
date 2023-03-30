@@ -11,6 +11,9 @@ import argparse
 import scipy
 import pickle
 
+# For visualization
+from utils import *
+
 # Dataset
 from torch_geometric.loader import DataLoader
 from pyg_dataset import pyg_dataset
@@ -258,7 +261,9 @@ model.eval()
 total_loss = 0.0
 nBatch = 0
 
-# For visualization
+y_test = []
+y_hat = []
+
 with torch.no_grad():
     sum_error = 0.0
     num_samples = 0
@@ -279,6 +284,9 @@ with torch.no_grad():
         total_loss += loss.item()
         nBatch += 1
 
+        y_test.append(targets.view(-1))
+        y_hat.append(predict.view(-1))
+
         sum_error += torch.sum(torch.abs(predict.view(-1) - targets.view(-1))).detach().cpu().numpy()
         num_samples += predict.size(0)
 
@@ -297,5 +305,31 @@ print('Test MAE:', test_mae)
 LOG.write('Test MAE: ' + str(test_mae) + '\n')
 print("Test time =", "{:.5f}".format(time.time() - t))
 LOG.write("Test time = " + "{:.5f}".format(time.time() - t) + "\n")
+
+# Visualiation
+designs_list = [
+    'superblue1',
+    'superblue2',
+    'superblue3',
+    'superblue4',
+    'superblue18',
+    'superblue19'
+]
+
+truth = torch.cat(y_test, dim = 0).cpu().detach().numpy()
+predict = torch.cat(y_hat, dim = 0).cpu().detach().numpy()
+
+with open(args.dir + "/" + args.name + ".truth.npy", 'wb') as f:
+    np.save(f, truth)
+
+with open(args.dir + "/" + args.name + ".predict.npy", 'wb') as f:
+    np.save(f, predict)
+
+method_name = 'MLP'
+design_name = designs_list[args.fold]
+output_name = args.dir + "/" + args.name + ".png"
+
+plot_figure(truth, predict, method_name, design_name, output_name)
+print('Done')
 
 LOG.close()

@@ -13,6 +13,9 @@ import argparse
 import scipy
 import matplotlib.pyplot as plt
 
+# For visualization
+from utils import *
+
 # Metrics
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import mean_squared_error
@@ -407,30 +410,17 @@ designs_list = [
 truth = torch.cat(y_test, dim = 0).cpu().detach().numpy()
 predict = torch.cat(y_hat, dim = 0).cpu().detach().numpy()
 
-r2 = r2_score(truth, predict)
-mae = mean_absolute_error(truth, predict)
+with open(args.dir + "/" + args.name + ".truth.npy", 'wb') as f:
+    np.save(f, truth)
 
-method_name = 'LT'
+with open(args.dir + "/" + args.name + ".predict.npy", 'wb') as f:
+    np.save(f, predict)
+
+method_name = "Transformer"
 design_name = designs_list[args.fold]
-title = method_name + ' on ' + design_name + ': MAE = ' + str(round(mae, 2)) + ', R2 = ' + str(round(r2, 2))
+output_name = args.dir + "/" + args.name + ".png"
 
-fig = plt.figure(figsize = (6, 6))
-gs = fig.add_gridspec(2, 2, width_ratios = (4, 1), height_ratios = (1, 4),
-                      left = 0.1, right = 0.9, bottom = 0.1, top = 0.9,
-                      wspace = 0.05, hspace = 0.05)
-
-ax = fig.add_subplot(gs[1, 0])
-ax_histx = fig.add_subplot(gs[0, 0], sharex = ax)
-ax_histy = fig.add_subplot(gs[1, 1], sharey=ax)
-
-scatter_hist(truth, predict, ax, ax_histx, ax_histy, title = title)
-
-file_name = method_name + '_' + design_name + '.png'
-# plt.xlabel('Truth')
-# plt.ylabel('Predict')
-# plt.title(method_name + ' tests on ' + design_name + ': MAE = ' + str(round(mae, 2)) + ', R2 = ' + str(round(r2, 2)), y = -0.01)
-plt.savefig(file_name, dpi = 200)
-plt.clf()
+plot_figure(truth, predict, method_name, design_name, output_name)
 
 LOG.close()
 print('Done')
