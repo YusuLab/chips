@@ -127,7 +127,18 @@ for fold in range(num_folds):
         dictionary = pickle.load(f)
         f.close()
         demand = dictionary['demand']
-        y_test.append(demand)
+        capacity = dictionary['capacity']
+        congestion = demand - capacity
+
+        if target == 'demand':
+            y_test.append(demand)
+        elif target == 'capacity':
+            y_test.append(capacity)
+        elif target == 'congestion':
+            y_test.append(congestion)
+        else:
+            print('Unknown learning target')
+            assert False
     
     print('Done reading test set')
 
@@ -145,7 +156,18 @@ for fold in range(num_folds):
         dictionary = pickle.load(f)
         f.close()
         demand = dictionary['demand']
-        y_train.append(demand)
+        capacity = dictionary['capacity']
+        congestion = demand - capacity
+
+        if target == 'demand':
+            y_test.append(demand)
+        elif target == 'capacity':
+            y_test.append(capacity)
+        elif target == 'congestion':
+            y_test.append(congestion)
+        else:
+            print('Unknown learning target')
+            assert False
 
     print('Done reading train set')
 
