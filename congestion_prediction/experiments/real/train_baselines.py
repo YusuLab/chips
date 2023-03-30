@@ -160,11 +160,11 @@ for fold in range(num_folds):
         congestion = demand - capacity
 
         if target == 'demand':
-            y_test.append(demand)
+            y_train.append(demand)
         elif target == 'capacity':
-            y_test.append(capacity)
+            y_train.append(capacity)
         elif target == 'congestion':
-            y_test.append(congestion)
+            y_train.append(congestion)
         else:
             print('Unknown learning target')
             assert False
