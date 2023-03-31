@@ -31,54 +31,37 @@ target = 'congestion'
 
 # Dataset
 data_dir = '../../data/2023-03-06_data/'
-num_samples = 32
-
-designs_list = [
-    'superblue1',
-    'superblue2',
-    'superblue3',
-    'superblue4',
-    'superblue18',
-    'superblue19'
-]
+graph_index = 0
 
 # Analysis
-y = []
-for sample in range(num_samples):
-    f = open(data_dir + '/' + str(sample) + '.targets.pkl', 'rb')
-    dictionary = pickle.load(f)
-    f.close()
-    demand = dictionary['demand']
-    capacity = dictionary['capacity']
-    congestion = demand - capacity
+f = open(data_dir + '/' + str(graph_index) + '.targets.pkl', 'rb')
+dictionary = pickle.load(f)
+f.close()
+demand = dictionary['demand']
+capacity = dictionary['capacity']
+congestion = demand - capacity
 
-    # Select the right learning target
-    if target == 'demand':
-        y.append(demand)
-    elif target == 'capacity':
-        y.append(capacity)
-    elif target == 'congestion':
-        y.append(congestion)
-    else:
-        print('Unknown learning target')
-        assert False
+# Select the right learning target
+if target == 'demand':
+    y = demand
+elif target == 'capacity':
+    y = capacity
+elif target == 'congestion':
+    y = congestion
+else:
+    print('Unknown learning target')
+    assert False
 
-y = np.sum(np.concatenate(y, axis = 0), axis = 1)
 y_min = np.min(y)
 y_max = np.max(y)
 y_mean = np.mean(y)
 y_std = np.std(y)
 
+# Normalization
+y = (y - y_mean) / y_std
+
 print('Learning target:', target)
 print('Statistics: min =', y_min, ', max =', y_max, ', mean =', y_mean, ', std =', y_std)
-
-# Folds information
-f = open(data_dir + '/6_fold_cross_validation.pkl', 'rb')
-dictionary = pickle.load(f)
-f.close()
-
-folds = dictionary['folds']
-num_folds = len(folds)
 
 # Methods we want to try
 method_names = [
@@ -105,136 +88,113 @@ mare_results = [[] for idx in range(num_methods)]
 # Numerical results
 results = [[] for idx in range(num_methods)]
 
-# For each fold
-for fold in range(num_folds):
-    print('Fold', fold, '-----------------------------')
-    test_indices = folds[fold]
-    train_indices = [idx for idx in range(num_samples) if idx not in test_indices]
-    print('Test indices:', test_indices)
-    print('Train indices:', train_indices)
+# Read features
+f = open(data_dir + '/' + str(graph_index) + '.node_features.pkl', 'rb')
+dictionary = pickle.load(f)
+f.close()
+design_name = dictionary['design']
+instance_features = dictionary['instance_features']
+X = instance_features
 
-    X_test = []
-    y_test = []
-    
-    for index in test_indices:
-        f = open(data_dir + '/' + str(index) + '.node_features.pkl', 'rb')
-        dictionary = pickle.load(f)
-        f.close()
-        instance_features = dictionary['instance_features']
-        X_test.append(instance_features)
+print(X.shape)
+print(y.shape)
 
-        f = open(data_dir + '/' + str(index) + '.targets.pkl', 'rb')
-        dictionary = pickle.load(f)
-        f.close()
-        demand = dictionary['demand']
-        capacity = dictionary['capacity']
-        congestion = demand - capacity
+num_samples = X.shape[0]
+perm = np.random.permutation(num_samples)
 
-        if target == 'demand':
-            y_test.append(demand)
-        elif target == 'capacity':
-            y_test.append(capacity)
-        elif target == 'congestion':
-            y_test.append(congestion)
-        else:
-            print('Unknown learning target')
-            assert False
-    
-    print('Done reading test set')
+train_percent = 60
+valid_percent = 20
+test_percent = 20
 
-    X_train = []
-    y_train = []
+num_train = num_samples * train_percent // 100
+num_valid = num_samples * valid_percent // 100
+num_test = num_samples - num_train - num_valid
 
-    for index in train_indices:
-        f = open(data_dir + '/' + str(index) + '.node_features.pkl', 'rb')
-        dictionary = pickle.load(f)
-        f.close()
-        instance_features = dictionary['instance_features']
-        X_train.append(instance_features)
+train_indices = perm[:num_train]
+valid_indices = perm[num_train:num_train+num_valid]
+test_indices = perm[num_train+num_valid:]
 
-        f = open(data_dir + '/' + str(index) + '.targets.pkl', 'rb')
-        dictionary = pickle.load(f)
-        f.close()
-        demand = dictionary['demand']
-        capacity = dictionary['capacity']
-        congestion = demand - capacity
+assert train_indices.shape[0] == num_train
+assert valid_indices.shape[0] == num_valid
+assert test_indices.shape[0] == num_test
 
-        if target == 'demand':
-            y_train.append(demand)
-        elif target == 'capacity':
-            y_train.append(capacity)
-        elif target == 'congestion':
-            y_train.append(congestion)
-        else:
-            print('Unknown learning target')
-            assert False
+print('Number of training samples:', num_train)
+print('Number of validation samples:', num_valid)
+print('Number of testing samples:', num_test)
 
-    print('Done reading train set')
+dictionary = {
+    'train_indices': train_indices,
+    'valid_indices': valid_indices,
+    'test_indices': test_indices
+}
+f = open(str(graph_index) + '.split.pkl', 'wb')
+pickle.dump(dictionary, f)
+f.close()
 
-    X_test = np.concatenate(X_test, axis = 0)
-    y_test = np.sum(np.concatenate(y_test, axis = 0), axis = 1)
-    X_train = np.concatenate(X_train, axis = 0)
-    y_train = np.sum(np.concatenate(y_train, axis = 0), axis = 1)
+X_train = X[train_indices, :]
+y_train = y[train_indices, :]
 
-    # Normalization
-    y_train = (y_train - y_mean) / y_std
-    y_test = (y_test - y_mean) / y_std
+X_valid = X[valid_indices, :]
+y_valid = y[valid_indices, :]
 
-    # Train and test for each method with this fold
-    for idx in range(num_methods):
-        method_name = method_names[idx]
+X_test = X[test_indices, :]
+y_test = y[test_indices, :]
 
-        # Create the model
-        if method_name == 'LR':
-            model = LinearRegression()
-        elif method_name == 'Ridge':
-            # You will need to search for the optimal hyper-parameter
-            model = Ridge(alpha = 10.0)
-        elif method_name == 'Linear-SVM':
-            # You will need to search for the optimal hyper-parameters
-            model = SVR(kernel = 'linear', C = 10.0, epsilon = 2)
-        elif method_name == 'RBF-SVM':
-            # You will need to search for the optimal hyper-parameters
-            model = SVR(kernel = 'rbf', C = 10.0)
-        elif method_name == 'Gaussian-Processes':
-            # You will need to search for the optimal hyper-parameter
-            kernel = gp.kernels.ConstantKernel(1.0, (1e-1, 1e3)) * gp.kernels.RBF(1.0, (1e-3, 1e3))
-            model = gp.GaussianProcessRegressor(kernel = kernel, alpha = 0.01, normalize_y = True)
-        else:
-            print('Unsupported method!')
-            assert False
+# Train and test for each method with this fold
+for idx in range(num_methods):
+    method_name = method_names[idx]
 
-        # Fit the model
-        model.fit(X_train, y_train)
+    # Create the model
+    if method_name == 'LR':
+        model = LinearRegression()
+    elif method_name == 'Ridge':
+        # You will need to search for the optimal hyper-parameter
+        model = Ridge(alpha = 10.0)
+    elif method_name == 'Linear-SVM':
+        # You will need to search for the optimal hyper-parameters
+        model = SVR(kernel = 'linear', C = 10.0, epsilon = 2)
+    elif method_name == 'RBF-SVM':
+        # You will need to search for the optimal hyper-parameters
+        model = SVR(kernel = 'rbf', C = 10.0)
+    elif method_name == 'Gaussian-Processes':
+        # You will need to search for the optimal hyper-parameter
+        kernel = gp.kernels.ConstantKernel(1.0, (1e-1, 1e3)) * gp.kernels.RBF(1.0, (1e-3, 1e3))
+        model = gp.GaussianProcessRegressor(kernel = kernel, alpha = 0.01, normalize_y = True)
+    else:
+        print('Unsupported method!')
+        assert False
 
-        # Make prediction
-        y_hat = model.predict(X_test)
+    # Fit the model
+    model.fit(X_train, y_train)
 
-        # Original scale
-        original_y_test = y_test * y_std + y_mean
-        original_y_hat = y_hat * y_std + y_mean
+    # Make prediction
+    y_hat = model.predict(X_test)
 
-        # Evaluate
-        mae = mean_absolute_error(y_test, y_hat)
-        mse = mean_squared_error(y_test, y_hat)
-        rmse = math.sqrt(mse)
-        mape = mean_absolute_percentage_error(original_y_test, original_y_hat)
-        mare = mean_absolute_relative_error(original_y_test, original_y_hat)
+    # Original scale
+    original_y_test = y_test * y_std + y_mean
+    original_y_hat = y_hat * y_std + y_mean
 
-        # Save the result
-        mae_results[idx].append(mae)
-        rmse_results[idx].append(rmse)
-        mape_results[idx].append(mape)
-        mare_results[idx].append(mare)
+    # Evaluate
+    mae = mean_absolute_error(y_test, y_hat)
+    mse = mean_squared_error(y_test, y_hat)
+    rmse = math.sqrt(mse)
+    mape = mean_absolute_percentage_error(original_y_test, original_y_hat)
+    mare = mean_absolute_relative_error(original_y_test, original_y_hat)
 
-        # Save numerical prediction
-        dictionary = {
-            'predict': original_y_hat,
-            'truth': original_y_test
-        }
-        results[idx].append(dictionary)
+    # Save the result
+    mae_results[idx].append(mae)
+    rmse_results[idx].append(rmse)
+    mape_results[idx].append(mape)
+    mare_results[idx].append(mare)
 
-        print('Done', method_name)
+    # Save numerical prediction
+    dictionary = {
+        'predict': original_y_hat,
+        'truth': original_y_test
+    }
+    results[idx].append(dictionary)
+
+    print('Done', method_name)
 
 # Summary
 print('Summary ----------------------------------')
@@ -244,48 +204,39 @@ for idx in range(num_methods):
 
     array = np.array(mae_results[idx]) # Remember to scale back to the original scale
     mae_mean = np.mean(array)
-    mae_std = np.std(array)
-    print('* MAE (normalized targets) =', mae_mean, '+/-', mae_std)
+    print('* MAE (normalized targets) =', mae_mean)
 
     array = np.array(mae_results[idx]) * y_std # Original scale
     mae_mean = np.mean(array)
-    mae_std = np.std(array)
-    print('* MAE =', mae_mean, '+/-', mae_std)
+    print('* MAE =', mae_mean)
 
     array = np.array(rmse_results[idx]) # Remember to scale back to the original scale
     rmse_mean = np.mean(array)
-    rmse_std = np.std(array)
-    print('* RMSE (normalized targets) =', rmse_mean, '+/-', rmse_std)
+    print('* RMSE (normalized targets) =', rmse_mean)
 
     array = np.array(rmse_results[idx]) * y_std # Original scale
     rmse_mean = np.mean(array)
-    rmse_std = np.std(array)
-    print('* RMSE =', rmse_mean, '+/-', rmse_std)
+    print('* RMSE =', rmse_mean)
 
     array = np.array(mape_results[idx]) # Average relative error
     mape_mean = np.mean(array)
-    mape_std = np.std(array)
-    print('* MAPE =', mape_mean, '+/-', mape_std)
+    print('* MAPE =', mape_mean)
 
     array = np.array(mare_results[idx]) # Average relative error
     mare_mean = np.mean(array)
-    mare_std = np.std(array)
-    print('* MARE =', mare_mean, '+/-', mare_std)
+    print('* MARE =', mare_mean)
 
 # Visualization
 print('------------------------------------------')
 for idx in range(num_methods):
     method_name = method_names[idx]
-    assert len(results[idx]) == len(designs_list)
     
-    for fold in range(len(designs_list)):
-        design_name = designs_list[fold]
-        dictionary = results[idx][fold]
-        predict = dictionary['predict']
-        truth = dictionary['truth']
+    dictionary = results[idx][0]
+    predict = dictionary['predict']
+    truth = dictionary['truth']
 
-        output_name = target + '_' + method_name + '_' + design_name + '.png'
-        plot_figure(truth, predict, method_name, design_name, output_name)
-        print('Created figure', output_name)
+    output_name = target + '_' + method_name + '_' + design_name + '.png'
+    plot_figure(truth, predict, method_name, design_name, output_name)
+    print('Created figure', output_name)
 
 print('Done')
