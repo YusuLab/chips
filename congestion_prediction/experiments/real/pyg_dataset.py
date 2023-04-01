@@ -63,15 +63,14 @@ class pyg_dataset(Dataset):
             dictionary = pickle.load(f)
             f.close()
 
+            demand = torch.Tensor(dictionary['demand'])
+            capacity = torch.Tensor(dictionary['capacity'])
+
             if self.target == 'demand':
-                demand = torch.Tensor(dictionary['demand'])
                 y = torch.sum(demand, dim = 1).unsqueeze(dim = 1)
             elif self.target == 'capacity':
-                capacity = torch.Tensor(dictionary['capacity'])
                 y = torch.sum(capacity, dim = 1).unsqueeze(dim = 1)
             elif self.target == 'congestion':
-                demand = torch.Tensor(dictionary['demand'])
-                capacity = torch.Tensor(dictionary['capacity'])
                 congestion = demand - capacity
                 y = torch.sum(congestion, dim = 1).unsqueeze(dim = 1)
             else:
@@ -105,6 +104,14 @@ class pyg_dataset(Dataset):
             example.y = y
             example.edge_index = torch.transpose(edge_index, 0, 1)
             example.edge_attr = edge_attr
+
+            # Load capacity
+            capacity = torch.sum(capacity, dim = 1).unsqueeze(dim = 1)
+            norm_cap = (capacity - torch.min(capacity)) / (torch.max(capacity) - torch.min(capacity))
+            capacity_features = torch.cat([capacity, torch.sqrt(capacity), norm_cap, torch.sqrt(norm_cap), torch.square(norm_cap), torch.sin(norm_cap), torch.cos(norm_cap)], dim = 1)
+
+            capacity_features = torch.cat([capacity_features, torch.zeros(num_nets, capacity_features.size(1))], dim = 0)
+            example.x = torch.cat([example.x, capacity_features], dim = 1)
 
             # Load positional encoding
             if self.load_pe == True:
