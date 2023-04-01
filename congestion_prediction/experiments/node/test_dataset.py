@@ -16,31 +16,18 @@ from torch_geometric.loader import DataLoader
 from pyg_dataset import pyg_dataset
 
 # Create train dataset
-train_dataset = pyg_dataset('../../data/2023-03-06_data/', fold_index = 0, split = 'train')
-test_dataset = pyg_dataset('../../data/2023-03-06_data/', fold_index = 0, split = 'test')
+dataset = pyg_dataset('../../data/2023-03-06_data/', graph_index = 0, target = 'demand', load_pe = True, num_eigen = 10, load_global_info = True, load_pd = True)
 
 # Data loaders
 batch_size = 1
-train_dataloader = DataLoader(train_dataset, batch_size, shuffle = True)
-test_dataloader = DataLoader(test_dataset, batch_size, shuffle = False)
+dataloader = DataLoader(dataset, batch_size, shuffle = True)
 
-print('Number of training examples:', len(train_dataset))
-print('Number of testing examples:', len(test_dataset))
-
-for batch_idx, data in enumerate(train_dataloader):
+for batch_idx, data in enumerate(dataloader):
     print(batch_idx)
     print(data)
     node_dim = data.x.size(1)
     edge_dim = data.edge_attr.size(1)
     num_outputs = data.y.size(1)
-    break
-
-for batch_idx, data in enumerate(test_dataloader):
-    print(batch_idx)
-    print(data)
-    assert node_dim == data.x.size(1)
-    assert edge_dim == data.edge_attr.size(1)
-    assert num_outputs == data.y.size(1)
     break
 
 print('Number of node features:', node_dim)

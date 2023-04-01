@@ -41,6 +41,11 @@ demand = dictionary['demand']
 capacity = dictionary['capacity']
 congestion = demand - capacity
 
+print('Min capacity:', np.min(capacity))
+print('Max capacity:', np.max(capacity))
+print('Mean capacity:', np.mean(capacity))
+print('STD capacity:', np.std(capacity))
+
 # Select the right learning target
 if target == 'demand':
     y = demand
