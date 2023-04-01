@@ -57,6 +57,8 @@ else:
     print('Unknown learning target')
     assert False
 
+y = np.sum(y, axis = 1)
+
 y_min = np.min(y)
 y_max = np.max(y)
 y_mean = np.mean(y)
@@ -137,13 +139,13 @@ pickle.dump(dictionary, f)
 f.close()
 
 X_train = X[train_indices, :]
-y_train = y[train_indices, :]
+y_train = y[train_indices]
 
 X_valid = X[valid_indices, :]
-y_valid = y[valid_indices, :]
+y_valid = y[valid_indices]
 
 X_test = X[test_indices, :]
-y_test = y[test_indices, :]
+y_test = y[test_indices]
 
 # Train and test for each method with this fold
 for idx in range(num_methods):
