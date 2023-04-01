@@ -58,7 +58,7 @@ def _parse_args():
     parser.add_argument('--load_global_info', '-load_global_info', type = int, default = 0, help = 'Global information')
     parser.add_argument('--load_pd', '-load_pd', type = int, default = 0, help = 'Persistence diagram & Neighbor list')
     parser.add_argument('--rb_order', '-rb_order', type = int, default = 0, help = 'NodeFormer hyperparameter')
-    parser.add_argument('--fold', '-fold', type = int, default = 0, help = 'Fold index in cross-validation')
+    parser.add_argument('--graph_index', '-graph_index', type = int, default = 0, help = 'Index of the graph')
     parser.add_argument('--device', '-device', type = str, default = 'cpu', help = 'cuda/cpu')
     args = parser.parse_args()
     return args
@@ -103,35 +103,24 @@ if args.load_pd == 1:
     load_pd = True
 
 if pe == 'lap':
-    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd)
-    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd)
+    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd)
 else:
-    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_global_info = load_global_info, load_pd = load_pd)
-    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_global_info = load_global_info, load_pd = load_pd)
+    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_global_info = load_global_info, load_pd = load_pd)
 
 # Data loaders
 batch_size = args.batch_size
-train_dataloader = DataLoader(train_dataset, batch_size, shuffle = True)
-valid_dataloader = DataLoader(test_dataset, batch_size, shuffle = False)
-test_dataloader = DataLoader(test_dataset, batch_size, shuffle = False)
+dataloader = DataLoader(dataset, batch_size, shuffle = False)
 
-print('Number of training examples:', len(train_dataset))
-print('Number of testing examples:', len(test_dataset))
+print('Number of nodes in the training set:', dataset.train_indices.shape[0])
+print('Number of nodes in the validation set:', dataset.valid_indices.shape[0])
+print('Number of nodes in the testing set:', dataset.test_indices.shape[0])
 
-for batch_idx, data in enumerate(train_dataloader):
+for batch_idx, data in enumerate(dataloader):
     print(batch_idx)
     print(data)
     node_dim = data.x.size(1)
     edge_dim = data.edge_attr.size(1)
     num_outputs = data.y.size(1)
-    break
-
-for batch_idx, data in enumerate(test_dataloader):
-    print(batch_idx)
-    print(data)
-    assert node_dim == data.x.size(1)
-    assert edge_dim == data.edge_attr.size(1)
-    assert num_outputs == data.y.size(1)
     break
 
 print('Number of node features:', node_dim)
@@ -146,7 +135,7 @@ if pe == 'lap':
 
 # Statistics
 y = []
-for batch_idx, data in enumerate(train_dataloader):
+for batch_idx, data in enumerate(dataloader):
     y.append(data.y.detach().numpy())
 y = np.concatenate(y)
 
@@ -191,7 +180,7 @@ for epoch in range(num_epoch):
     sum_error = 0.0
     num_samples = 0
 
-    for batch_idx, data in enumerate(train_dataloader):
+    for batch_idx, data in enumerate(dataloader):
         data = data.to(device = device)
         target = (data.y - y_mean) / y_std
 
@@ -209,7 +198,10 @@ for epoch in range(num_epoch):
 
         # NodeFormer
         predict, _ = model(data.x, adjs)
-        predict = predict[: target.size(0), :]
+        
+        # Train indices
+        predict = predict[dataset.train_indices, :]
+        target = target[dataset.train_indices, :]
 
         optimizer.zero_grad()
 
@@ -226,8 +218,8 @@ for epoch in range(num_epoch):
         num_samples += predict.size(0)
 
         if batch_idx % 10 == 0:
-            print('Batch', batch_idx, '/', len(train_dataloader),': Loss =', loss.item())
-            LOG.write('Batch ' + str(batch_idx) + '/' + str(len(train_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
+            print('Batch', batch_idx, '/', len(dataloader),': Loss =', loss.item())
+            LOG.write('Batch ' + str(batch_idx) + '/' + str(len(dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
     train_mae = sum_error / (num_samples * num_outputs)
     avg_loss = total_loss / nBatch
@@ -250,7 +242,7 @@ for epoch in range(num_epoch):
     with torch.no_grad():
         sum_error = 0.0
         num_samples = 0
-        for batch_idx, data in enumerate(valid_dataloader):
+        for batch_idx, data in enumerate(dataloader):
             data = data.to(device = device)
             target = (data.y - y_mean) / y_std
 
@@ -268,7 +260,10 @@ for epoch in range(num_epoch):
 
             # NodeFormer
             predict, _ = model(data.x, adjs)
-            predict = predict[: target.size(0), :]
+            
+            # Validation indices
+            predict = predict[dataset.valid_indices, :]
+            target = target[dataset.valid_indices, :]
 
             # Mean squared error loss
             loss = F.mse_loss(predict.view(-1), target.view(-1), reduction = 'mean')
@@ -280,8 +275,8 @@ for epoch in range(num_epoch):
             num_samples += predict.size(0)
              
             if batch_idx % 10 == 0:
-                print('Valid Batch', batch_idx, '/', len(valid_dataloader),': Loss =', loss.item())
-                LOG.write('Valid Batch ' + str(batch_idx) + '/' + str(len(valid_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
+                print('Valid Batch', batch_idx, '/', len(dataloader),': Loss =', loss.item())
+                LOG.write('Valid Batch ' + str(batch_idx) + '/' + str(len(dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
     valid_mae = sum_error / (num_samples * num_outputs)
     avg_loss = total_loss / nBatch
@@ -352,7 +347,10 @@ with torch.no_grad():
 
         # NodeFormer
         predict, _ = model(data.x, adjs)
-        predict = predict[: target.size(0), :]
+        
+        # Test indices
+        predict = predict[dataset.test_indices, :]
+        target = target[dataset.test_indices, :]
         
         # Mean squared error loss
         loss = F.mse_loss(predict.view(-1), target.view(-1), reduction = 'mean')
@@ -367,8 +365,8 @@ with torch.no_grad():
         num_samples += predict.size(0)
 
         if batch_idx % 10 == 0:
-            print('Test Batch', batch_idx, '/', len(test_dataloader),': Loss =', loss.item())
-            LOG.write('Test Batch ' + str(batch_idx) + '/' + str(len(test_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
+            print('Test Batch', batch_idx, '/', len(dataloader),': Loss =', loss.item())
+            LOG.write('Test Batch ' + str(batch_idx) + '/' + str(len(dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
 test_mae = sum_error / (num_samples * num_outputs)
 avg_loss = total_loss / nBatch
@@ -385,17 +383,8 @@ print("Test time =", "{:.5f}".format(time.time() - t))
 LOG.write("Test time = " + "{:.5f}".format(time.time() - t) + "\n")
 
 # Visualiation
-designs_list = [
-    'superblue1',
-    'superblue2',
-    'superblue3',
-    'superblue4',
-    'superblue18',
-    'superblue19'
-]
-
-truth = torch.cat(y_test, dim = 0).cpu().detach().numpy() * y_std
-predict = torch.cat(y_hat, dim = 0).cpu().detach().numpy() * y_std
+truth = torch.cat(y_test, dim = 0).cpu().detach().numpy() * y_std + y_mean
+predict = torch.cat(y_hat, dim = 0).cpu().detach().numpy() * y_std + y_mean
 
 with open(args.dir + "/" + args.name + ".truth.npy", 'wb') as f:
     np.save(f, truth)
@@ -404,7 +393,7 @@ with open(args.dir + "/" + args.name + ".predict.npy", 'wb') as f:
     np.save(f, predict)
 
 method_name = 'NodeFormer'
-design_name = designs_list[args.fold]
+design_name = dataset.design_name
 output_name = args.dir + "/" + args.name + ".png"
 
 plot_figure(truth, predict, method_name, design_name, output_name)

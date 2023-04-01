@@ -2,9 +2,12 @@
 
 program=train_mlp
 
-#target=demand
+target=demand
 #target=capacity
-target=congestion
+#target=congestion
+
+# Index of graph
+graph_index=0
 
 mkdir $program
 cd $program
@@ -36,12 +39,11 @@ device_idx=1
 # Test mode
 test_mode=0
 
-for load_pe in 1 
-do
-for fold in 0 1 2 3 4 5
-do
-name=${program}.target.${target}.num_epoch.${num_epoch}.batch_size.${batch_size}.learning_rate.${learning_rate}.seed.${seed}.hidden_dim.${hidden_dim}.load_pe.${load_pe}.num_eigen.${num_eigen}.load_global_info.${load_global_info}.load_pd.${load_pd}.fold.${fold}
-CUDA_VISIBLE_DEVICES=$device_idx python3 $program.py --target=$target --dir=$dir --data_dir=${data_dir} --name=$name --num_epoch=$num_epoch --batch_size=$batch_size --learning_rate=$learning_rate --seed=$seed --hidden_dim=$hidden_dim --load_pe=${load_pe} --num_eigen=${num_eigen} --load_global_info=$load_global_info --load_pd=$load_pd --test_mode=$test_mode --fold=$fold --device=$device
-done
-done
+# Position encoding
+load_pe=1
+
+# Execution
+name=${program}.target.${target}.num_epoch.${num_epoch}.batch_size.${batch_size}.learning_rate.${learning_rate}.seed.${seed}.hidden_dim.${hidden_dim}.load_pe.${load_pe}.num_eigen.${num_eigen}.load_global_info.${load_global_info}.load_pd.${load_pd}.graph_index.${graph_index}
+CUDA_VISIBLE_DEVICES=$device_idx python3 $program.py --target=$target --dir=$dir --data_dir=${data_dir} --name=$name --num_epoch=$num_epoch --batch_size=$batch_size --learning_rate=$learning_rate --seed=$seed --hidden_dim=$hidden_dim --load_pe=${load_pe} --num_eigen=${num_eigen} --load_global_info=$load_global_info --load_pd=$load_pd --test_mode=$test_mode --graph_index=$graph_index --device=$device
+
 

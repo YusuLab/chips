@@ -37,6 +37,8 @@ class pyg_dataset(Dataset):
         dictionary = pickle.load(f)
         f.close()
 
+        self.design_name = dictionary['design']
+
         num_instances = dictionary['num_instances']
         num_nets = dictionary['num_nets']
         instance_features = torch.Tensor(dictionary['instance_features'])

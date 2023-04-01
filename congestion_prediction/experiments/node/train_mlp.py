@@ -37,7 +37,7 @@ def _parse_args():
     parser.add_argument('--learning_rate', '-learning_rate', type = float, default = 0.001, help = 'Initial learning rate')
     parser.add_argument('--seed', '-s', type = int, default = 123456789, help = 'Random seed')
     parser.add_argument('--hidden_dim', '-hidden_dim', type = int, default = 32, help = 'Hidden dimension')
-    parser.add_argument('--fold', '-fold', type = int, default = 0, help = 'Fold index in cross-validation')
+    parser.add_argument('--graph_index', '-graph_index', type = int, default = 0, help = 'Index of graph')
     parser.add_argument('--load_pe', '-load_pe', type = int, default = 0, help = 'Position encoding')
     parser.add_argument('--load_global_info', '-load_global_info', type = int, default = 0, help = 'Global information')
     parser.add_argument('--load_pd', '-load_pd', type = int, default = 0, help = 'Persistence diagram & Neighbor list')
@@ -88,32 +88,22 @@ if args.load_pd == 1:
 
 # Dataset
 print(args.data_dir)
-train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_pe = load_pe, num_eigen = num_eigen, load_global_info = load_global_info, load_pd = load_pd)
-test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_pe = load_pe, num_eigen = num_eigen, load_global_info = load_global_info, load_pd = load_pd)
+dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_pe = load_pe, num_eigen = num_eigen, load_global_info = load_global_info, load_pd = load_pd)
 
 # Data loaders
 batch_size = args.batch_size
-train_dataloader = DataLoader(train_dataset, batch_size, shuffle = True)
-valid_dataloader = DataLoader(test_dataset, batch_size, shuffle = False)
-test_dataloader = DataLoader(test_dataset, batch_size, shuffle = False)
+dataloader = DataLoader(dataset, batch_size, shuffle = False)
 
-print('Number of training examples:', len(train_dataset))
-print('Number of testing examples:', len(test_dataset))
+print('Number of nodes in the training set:', dataset.train_indices.shape[0])
+print('Number of nodes in the validation set:', dataset.valid_indices.shape[0])
+print('Number of nodes in the testing set:', dataset.test_indices.shape[0])
 
-for batch_idx, data in enumerate(train_dataloader):
+for batch_idx, data in enumerate(dataloader):
     print(batch_idx)
     print(data)
     node_dim = data.x.size(1)
     edge_dim = data.edge_attr.size(1)
     num_outputs = data.y.size(1)
-    break
-
-for batch_idx, data in enumerate(test_dataloader):
-    print(batch_idx)
-    print(data)
-    assert node_dim == data.x.size(1)
-    assert edge_dim == data.edge_attr.size(1)
-    assert num_outputs == data.y.size(1)
     break
 
 print('Number of node features:', node_dim)
@@ -156,7 +146,7 @@ for epoch in range(num_epoch):
     sum_error = 0.0
     num_samples = 0
     
-    for batch_idx, data in enumerate(train_dataloader):
+    for batch_idx, data in enumerate(dataloader):
         if load_pe == True:
             node_feat = torch.cat([data.x, data.evects], dim = 1).to(device = device)
         else:
@@ -165,7 +155,10 @@ for epoch in range(num_epoch):
 
         # Model
         predict = model(node_feat)
-        predict = predict[: targets.size(0), :]
+        
+        # Train indices
+        predict = predict[dataset.train_indices, :]
+        targets = targets[dataset.train_indices, :]
 
         optimizer.zero_grad()
         
@@ -181,8 +174,8 @@ for epoch in range(num_epoch):
         total_loss += loss.item()
         nBatch += 1
         if batch_idx % 10 == 0:
-            print('Batch', batch_idx, '/', len(train_dataloader),': Loss =', loss.item())
-            LOG.write('Batch ' + str(batch_idx) + '/' + str(len(train_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
+            print('Batch', batch_idx, '/', len(dataloader),': Loss =', loss.item())
+            LOG.write('Batch ' + str(batch_idx) + '/' + str(len(dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
     train_mae = sum_error / num_samples
     avg_loss = total_loss / nBatch
@@ -203,7 +196,7 @@ for epoch in range(num_epoch):
     with torch.no_grad():
         sum_error = 0.0
         num_samples = 0
-        for batch_idx, data in enumerate(valid_dataloader):
+        for batch_idx, data in enumerate(dataloader):
             if load_pe == True:
                 node_feat = torch.cat([data.x, data.evects], dim = 1).to(device = device)
             else:
@@ -212,7 +205,10 @@ for epoch in range(num_epoch):
 
             # Model
             predict = model(node_feat)
-            predict = predict[: targets.size(0), :]
+            
+            # Validation indices
+            predict = predict[dataset.valid_indices, :]
+            targets = targets[dataset.valid_indices, :]
 
             # Mean squared error loss
             loss = F.mse_loss(predict.view(-1), targets.view(-1), reduction = 'mean')
@@ -225,8 +221,8 @@ for epoch in range(num_epoch):
             num_samples += predict.size(0)
              
             if batch_idx % 10 == 0:
-                print('Valid Batch', batch_idx, '/', len(valid_dataloader),': Loss =', loss.item())
-                LOG.write('Valid Batch ' + str(batch_idx) + '/' + str(len(valid_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
+                print('Valid Batch', batch_idx, '/', len(dataloader),': Loss =', loss.item())
+                LOG.write('Valid Batch ' + str(batch_idx) + '/' + str(len(dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
     valid_mae = sum_error / num_samples
     avg_loss = total_loss / nBatch
@@ -273,7 +269,7 @@ y_hat = []
 with torch.no_grad():
     sum_error = 0.0
     num_samples = 0
-    for batch_idx, data in enumerate(test_dataloader):
+    for batch_idx, data in enumerate(dataloader):
         if load_pe == True:
             node_feat = torch.cat([data.x, data.evects], dim = 1).to(device = device)
         else:
@@ -282,7 +278,10 @@ with torch.no_grad():
 
         # Model
         predict = model(node_feat)
-        predict = predict[: targets.size(0), :]
+        
+        # Test indices
+        predict = predict[dataset.test_indices, :]
+        targets = targets[dataset.test_indices, :]
 
         # Mean squared error loss
         loss = F.mse_loss(predict.view(-1), targets.view(-1), reduction = 'mean')
@@ -297,8 +296,8 @@ with torch.no_grad():
         num_samples += predict.size(0)
 
         if batch_idx % 10 == 0:
-            print('Test Batch', batch_idx, '/', len(test_dataloader),': Loss =', loss.item())
-            LOG.write('Test Batch ' + str(batch_idx) + '/' + str(len(test_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
+            print('Test Batch', batch_idx, '/', len(dataloader),': Loss =', loss.item())
+            LOG.write('Test Batch ' + str(batch_idx) + '/' + str(len(dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
 test_mae = sum_error / num_samples 
 avg_loss = total_loss / nBatch
@@ -313,15 +312,6 @@ print("Test time =", "{:.5f}".format(time.time() - t))
 LOG.write("Test time = " + "{:.5f}".format(time.time() - t) + "\n")
 
 # Visualiation
-designs_list = [
-    'superblue1',
-    'superblue2',
-    'superblue3',
-    'superblue4',
-    'superblue18',
-    'superblue19'
-]
-
 truth = torch.cat(y_test, dim = 0).cpu().detach().numpy()
 predict = torch.cat(y_hat, dim = 0).cpu().detach().numpy()
 
@@ -332,7 +322,7 @@ with open(args.dir + "/" + args.name + ".predict.npy", 'wb') as f:
     np.save(f, predict)
 
 method_name = 'MLP'
-design_name = designs_list[args.fold]
+design_name = dataset.design_name
 output_name = args.dir + "/" + args.name + ".png"
 
 plot_figure(truth, predict, method_name, design_name, output_name)

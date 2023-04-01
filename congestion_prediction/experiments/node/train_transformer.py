@@ -54,7 +54,7 @@ def _parse_args():
     parser.add_argument('--load_pd', '-load_pd', type = int, default = 0, help = 'Persistence diagram & Neighbor list')
     parser.add_argument('--test_mode', '-test_mode', type = int, default = 0, help = 'Test mode')
     parser.add_argument('--device', '-device', type = str, default = 'cpu', help = 'cuda/cpu')
-    parser.add_argument('--fold', '-fold', type = int, default = 0, help = 'Fold')
+    parser.add_argument('--graph_index', '-graph_index', type = int, default = 0, help = 'Index of the graph')
     args = parser.parse_args()
     return args
 
@@ -97,35 +97,24 @@ pe_type = args.pe_type
 pe_dim = args.pe_dim
 
 if pe_type == 'lap':
-    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_pe = True, num_eigen = pe_dim, load_global_info = load_global_info, load_pd = load_pd)
-    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_pe = True, num_eigen = pe_dim, load_global_info = load_global_info, load_pd = load_pd)
+    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_pe = True, num_eigen = pe_dim, load_global_info = load_global_info, load_pd = load_pd)
 else:
-    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_global_info = load_global_info, load_pd = load_pd)
-    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_global_info = load_global_info, load_pd = load_pd)
+    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_global_info = load_global_info, load_pd = load_pd)
 
 # Data loaders
 batch_size = args.batch_size
-train_dataloader = DataLoader(train_dataset, batch_size, shuffle = True)
-valid_dataloader = DataLoader(test_dataset, batch_size, shuffle = False)
-test_dataloader = DataLoader(test_dataset, batch_size, shuffle = False)
+dataloader = DataLoader(dataset, batch_size, shuffle = False)
 
-print('Number of training examples:', len(train_dataset))
-print('Number of testing examples:', len(test_dataset))
+print('Number of nodes in the training set:', dataset.train_indices.shape[0])
+print('Number of nodes in the validation set:', dataset.valid_indices.shape[0])
+print('Number of nodes in the testing set:', dataset.test_indices.shape[0])
 
-for batch_idx, data in enumerate(train_dataloader):
+for batch_idx, data in enumerate(dataloader):
     print(batch_idx)
     print(data)
     node_dim = data.x.size(1)
     edge_dim = data.edge_attr.size(1)
     num_outputs = data.y.size(1)
-    break
-
-for batch_idx, data in enumerate(test_dataloader):
-    print(batch_idx)
-    print(data)
-    assert node_dim == data.x.size(1)
-    assert edge_dim == data.edge_attr.size(1)
-    assert num_outputs == data.y.size(1)
     break
 
 print('Number of node features:', node_dim)
@@ -141,12 +130,7 @@ if pe_type == 'lap':
 # Search for the maximum length
 max_size = 0
 
-for batch_idx, data in enumerate(train_dataloader):
-    num_nodes = data.x.size(0)
-    if num_nodes > max_size:
-        max_size = num_nodes
-
-for batch_idx, data in enumerate(test_dataloader):
+for batch_idx, data in enumerate(dataloader):
     num_nodes = data.x.size(0)
     if num_nodes > max_size:
         max_size = num_nodes
@@ -188,7 +172,7 @@ for epoch in range(num_epoch):
     sum_error = 0.0
     num_samples = 0
     
-    for batch_idx, data in enumerate(train_dataloader):
+    for batch_idx, data in enumerate(dataloader):
         data = data.to(device = device)
         node_feat = data.x
         targets = data.y
@@ -203,7 +187,10 @@ for epoch in range(num_epoch):
 
         # Model
         predict = model(node_feat)
-        predict = predict[:, : targets.size(1), :]
+
+        # Train indices
+        predict = predict[:, dataset.train_indices, :]
+        targets = targets[:, dataset.train_indices, :]
 
         optimizer.zero_grad()
         
@@ -221,8 +208,8 @@ for epoch in range(num_epoch):
         total_loss += loss.item()
         nBatch += 1
         if batch_idx % 100 == 0:
-            print('Batch', batch_idx, '/', len(train_dataloader),': Loss =', loss.item())
-            LOG.write('Batch ' + str(batch_idx) + '/' + str(len(train_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
+            print('Batch', batch_idx, '/', len(dataloader),': Loss =', loss.item())
+            LOG.write('Batch ' + str(batch_idx) + '/' + str(len(dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
     train_mae = sum_error / (num_samples * num_outputs)
     avg_loss = total_loss / nBatch
@@ -244,7 +231,7 @@ for epoch in range(num_epoch):
         sum_error = 0.0
         num_samples = 0
         
-        for batch_idx, data in enumerate(valid_dataloader):
+        for batch_idx, data in enumerate(dataloader):
             data = data.to(device = device)
             node_feat = data.x
             targets = data.y
@@ -259,7 +246,10 @@ for epoch in range(num_epoch):
 
             # Model
             predict = model(node_feat)
-            predict = predict[:, : targets.size(1), :]
+            
+            # Validation indices
+            predict = predict[:, dataset.valid_indices, :]
+            targets = targets[:, dataset.valid_indices, :]
 
             # Mean squared error loss
             targets = targets.contiguous()
@@ -274,8 +264,8 @@ for epoch in range(num_epoch):
             num_samples += targets.size(1)
              
             if batch_idx % 100 == 0:
-                print('Valid Batch', batch_idx, '/', len(valid_dataloader),': Loss =', loss.item())
-                LOG.write('Valid Batch ' + str(batch_idx) + '/' + str(len(valid_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
+                print('Valid Batch', batch_idx, '/', len(dataloader),': Loss =', loss.item())
+                LOG.write('Valid Batch ' + str(batch_idx) + '/' + str(len(dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
     valid_mae = sum_error / (num_samples * num_outputs)
     avg_loss = total_loss / nBatch
@@ -310,39 +300,6 @@ if args.test_mode == 0:
 print("Load the trained model at", model_name)
 model.load_state_dict(torch.load(model_name))
 
-# +---------------+
-# | Testing Phase |
-# +---------------+
-
-# For visualization
-def scatter_hist(x, y, ax, ax_histx, ax_histy, title = None):
-    # no labels
-    ax_histx.tick_params(axis="x", labelbottom=False)
-    ax_histy.tick_params(axis="y", labelleft=False)
-
-    # the scatter plot:
-    ax.scatter(x, y)
-
-    ax.set_xlabel('Truth')
-    ax.set_ylabel('Predict')
-
-    '''
-    if title is not None:
-        ax.set_title(title, y = -0.01)
-    '''
-
-    # now determine nice limits by hand:
-    binwidth = 4.0
-    xymax = max(np.max(np.abs(x)), np.max(np.abs(y)))
-    lim = (int(xymax/binwidth) + 1) * binwidth
-
-    bins = np.arange(-lim, lim + binwidth, binwidth)
-    ax_histx.hist(x, bins=bins)
-    ax_histy.hist(y, bins=bins, orientation='horizontal')
-
-    if title is not None:
-        ax_histx.set_title(title)
-
 # Testing
 t = time.time()
 model.eval()
@@ -356,7 +313,7 @@ with torch.no_grad():
     sum_error = 0.0
     num_samples = 0
     
-    for batch_idx, data in enumerate(test_dataloader):
+    for batch_idx, data in enumerate(dataloader):
         data = data.to(device = device)
         node_feat = data.x
         targets = data.y
@@ -371,7 +328,10 @@ with torch.no_grad():
 
         # Model
         predict = model(node_feat)
-        predict = predict[:, : targets.size(1), :]
+        
+        # Test indices
+        predict = predict[:, dataset.test_indices, :]
+        targets = targets[:, dataset.test_indices, :]
         
         # Mean squared error loss
         targets = targets.contiguous()
@@ -388,8 +348,8 @@ with torch.no_grad():
         num_samples += targets.size(1)
 
         if batch_idx % 100 == 0:
-            print('Test Batch', batch_idx, '/', len(test_dataloader),': Loss =', loss.item())
-            LOG.write('Test Batch ' + str(batch_idx) + '/' + str(len(test_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
+            print('Test Batch', batch_idx, '/', len(dataloader),': Loss =', loss.item())
+            LOG.write('Test Batch ' + str(batch_idx) + '/' + str(len(dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
 test_mae = sum_error / (num_samples * num_outputs)
 avg_loss = total_loss / nBatch
@@ -404,15 +364,6 @@ print("Test time =", "{:.5f}".format(time.time() - t))
 LOG.write("Test time = " + "{:.5f}".format(time.time() - t) + "\n")
 
 # Visualiation
-designs_list = [
-    'superblue1',
-    'superblue2',
-    'superblue3',
-    'superblue4',
-    'superblue18',
-    'superblue19'
-]
-
 truth = torch.cat(y_test, dim = 0).cpu().detach().numpy()
 predict = torch.cat(y_hat, dim = 0).cpu().detach().numpy()
 
@@ -423,7 +374,7 @@ with open(args.dir + "/" + args.name + ".predict.npy", 'wb') as f:
     np.save(f, predict)
 
 method_name = "Transformer"
-design_name = designs_list[args.fold]
+design_name = dataset.design_name
 output_name = args.dir + "/" + args.name + ".png"
 
 plot_figure(truth, predict, method_name, design_name, output_name)

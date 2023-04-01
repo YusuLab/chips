@@ -25,9 +25,9 @@ def mean_absolute_relative_error(y_truth, y_pred):
     return np.mean(np.abs(y_truth - y_pred) / np.abs(y_truth))
 
 # Learning target
-# target = 'demand'
+target = 'demand'
 # target = 'capacity'
-target = 'congestion'
+# target = 'congestion'
 
 # Dataset
 data_dir = '../../data/2023-03-06_data/'
