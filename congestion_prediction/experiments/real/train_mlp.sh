@@ -36,7 +36,7 @@ device_idx=1
 # Test mode
 test_mode=0
 
-for load_pe in 0 1 
+for load_pe in 1 
 do
 for fold in 0 1 2 3 4 5
 do

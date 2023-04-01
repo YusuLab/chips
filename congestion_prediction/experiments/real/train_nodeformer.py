@@ -394,8 +394,8 @@ designs_list = [
     'superblue19'
 ]
 
-truth = torch.cat(y_test, dim = 0).cpu().detach().numpy() * y_std
-predict = torch.cat(y_hat, dim = 0).cpu().detach().numpy() * y_std
+truth = torch.cat(y_test, dim = 0).cpu().detach().numpy() * y_std + y_mean
+predict = torch.cat(y_hat, dim = 0).cpu().detach().numpy() * y_std + y_mean
 
 with open(args.dir + "/" + args.name + ".truth.npy", 'wb') as f:
     np.save(f, truth)

@@ -310,39 +310,6 @@ if args.test_mode == 0:
 print("Load the trained model at", model_name)
 model.load_state_dict(torch.load(model_name))
 
-# +---------------+
-# | Testing Phase |
-# +---------------+
-
-# For visualization
-def scatter_hist(x, y, ax, ax_histx, ax_histy, title = None):
-    # no labels
-    ax_histx.tick_params(axis="x", labelbottom=False)
-    ax_histy.tick_params(axis="y", labelleft=False)
-
-    # the scatter plot:
-    ax.scatter(x, y)
-
-    ax.set_xlabel('Truth')
-    ax.set_ylabel('Predict')
-
-    '''
-    if title is not None:
-        ax.set_title(title, y = -0.01)
-    '''
-
-    # now determine nice limits by hand:
-    binwidth = 4.0
-    xymax = max(np.max(np.abs(x)), np.max(np.abs(y)))
-    lim = (int(xymax/binwidth) + 1) * binwidth
-
-    bins = np.arange(-lim, lim + binwidth, binwidth)
-    ax_histx.hist(x, bins=bins)
-    ax_histy.hist(y, bins=bins, orientation='horizontal')
-
-    if title is not None:
-        ax_histx.set_title(title)
-
 # Testing
 t = time.time()
 model.eval()
