@@ -232,6 +232,7 @@ for epoch in range(num_epoch):
         if gnn_type == 'pna':
             data.edge_attr = data.edge_attr.type(torch.FloatTensor).to(device = device)
 
+        # Model
         predict = model(data)
 
         # Train indices

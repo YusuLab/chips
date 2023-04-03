@@ -7,7 +7,7 @@ target=demand
 #target=congestion
 
 # Index of graph
-graph_index=0
+graph_index=10
 
 mkdir $program
 cd $program
