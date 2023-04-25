@@ -7,7 +7,7 @@ import numpy as np
 import pickle
 
 class pyg_dataset(Dataset):
-    def __init__(self, data_dir, graph_index, target, load_pe = False, num_eigen = 5, load_global_info = True, load_pd = False):
+    def __init__(self, data_dir, graph_index, target, load_pe = False, num_eigen = 5, load_global_info = True, load_pd = False, graph_rep = 'bipartite'):
         super().__init__()
         self.data_dir = data_dir
         self.graph_index = graph_index
@@ -42,8 +42,15 @@ class pyg_dataset(Dataset):
         num_instances = dictionary['num_instances']
         num_nets = dictionary['num_nets']
         instance_features = torch.Tensor(dictionary['instance_features'])
+        
+        instance_features = instance_features[:, 2:]
+        
         net_features = torch.zeros(num_nets, instance_features.size(1))
-        x = torch.cat([instance_features, net_features], dim = 0)
+        
+        if graph_rep == 'bipartite':
+            x = torch.cat([instance_features, net_features], dim = 0)
+        else:
+            x = instance_features
 
         # Read learning targets
         file_name = data_dir + '/' + str(graph_index) + '.targets.pkl'
@@ -66,32 +73,56 @@ class pyg_dataset(Dataset):
             assert False
 
         # Read connection
-        file_name = data_dir + '/' + str(graph_index) + '.bipartite.pkl'
-        f = open(file_name, 'rb')
-        dictionary = pickle.load(f)
-        f.close()
+        if graph_rep == 'bipartite':
+            file_name = data_dir + '/' + str(graph_index) + '.bipartite.pkl'
+            f = open(file_name, 'rb')
+            dictionary = pickle.load(f)
+            f.close()
 
-        instance_idx = torch.Tensor(dictionary['instance_idx']).unsqueeze(dim = 1).long()
-        net_idx = torch.Tensor(dictionary['net_idx']) + num_instances
-        net_idx = net_idx.unsqueeze(dim = 1).long()
+            instance_idx = torch.Tensor(dictionary['instance_idx']).unsqueeze(dim = 1).long()
+            net_idx = torch.Tensor(dictionary['net_idx']) + num_instances
+            net_idx = net_idx.unsqueeze(dim = 1).long()
 
-        edge_attr = torch.Tensor(dictionary['edge_attr']).unsqueeze(dim = 1).float()
-        edge_index = torch.cat((instance_idx, net_idx), dim = 1)
-            
+            edge_attr = torch.Tensor(dictionary['edge_attr']).float()#.unsqueeze(dim = 1).float()
+            edge_index = torch.cat((instance_idx, net_idx), dim = 1)
+        
+        else:
+            file_name = data_dir + '/' + str(graph_index) + '.star.pkl'
+            f = open(file_name, 'rb')
+            dictionary = pickle.load(f)
+            f.close()
+
+            edge_attr = torch.Tensor(dictionary['edge_attr']).float()
+            edge_index = torch.Tensor(dictionary['edge_index']).long()
+            x = instance_features
+
         # PyG data
+        
         example = Data()
         example.__num_nodes__ = x.size(0)
         example.x = x
         example.y = y
         example.edge_index = torch.transpose(edge_index, 0, 1)
         example.edge_attr = edge_attr
+        
+        print(example, graph_index)
 
+        with open(f"../../data/2023-03-06_data/{graph_index}.weight_demand.pickle", "rb") as f:
+            weight_dict = pickle.load(f)
+        
+        targets = y
+        
+#         weights = torch.tensor([weight_dict[target.item()] for target in targets.view(-1)]).float()
+#         example.weights = weights
+        
         # Load capacity
         capacity = torch.sum(capacity, dim = 1).unsqueeze(dim = 1)
         norm_cap = (capacity - torch.min(capacity)) / (torch.max(capacity) - torch.min(capacity))
         capacity_features = torch.cat([capacity, torch.sqrt(capacity), norm_cap, torch.sqrt(norm_cap), torch.square(norm_cap), torch.sin(norm_cap), torch.cos(norm_cap)], dim = 1)
         
-        capacity_features = torch.cat([capacity_features, torch.zeros(num_nets, capacity_features.size(1))], dim = 0)
+        if graph_rep == 'bipartite':
+            capacity_features = torch.cat([capacity_features, torch.zeros(num_nets, capacity_features.size(1))], dim = 0)
+        
         example.x = torch.cat([example.x, capacity_features], dim = 1)
 
         # Load positional encoding
@@ -131,15 +162,19 @@ class pyg_dataset(Dataset):
             assert pd.size(0) == num_instances
             assert neighbor_list.size(0) == num_instances
 
-            pd = torch.cat([pd, torch.zeros(num_nets, pd.size(1))], dim = 0)
-            neighbor_list = torch.cat([neighbor_list, torch.zeros(num_nets, neighbor_list.size(1))], dim = 0)
+            if graph_rep == 'bipartite':
+                pd = torch.cat([pd, torch.zeros(num_nets, pd.size(1))], dim = 0)
+                neighbor_list = torch.cat([neighbor_list, torch.zeros(num_nets, neighbor_list.size(1))], dim = 0)
 
             example.x = torch.cat([example.x, pd, neighbor_list], dim = 1)
 
         # Filter out input features of validation and testing nodes
         example.x[self.valid_indices, :] = 0
         example.x[self.test_indices, :] = 0
-
+        
+        
+        
+        
         self.example = example
 
     def len(self):
