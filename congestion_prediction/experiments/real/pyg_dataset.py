@@ -7,7 +7,7 @@ import numpy as np
 import pickle
 
 class pyg_dataset(Dataset):
-    def __init__(self, data_dir, fold_index, split, target, load_pe = False, num_eigen = 5, load_global_info = True, load_pd = False, total_samples = 32):
+    def __init__(self, data_dir, fold_index, split, target, load_pe = False, num_eigen = 5, load_global_info = False, load_pd = False, total_samples = 32):
         super().__init__()
         self.data_dir = data_dir
         self.fold_index = fold_index
@@ -45,6 +45,8 @@ class pyg_dataset(Dataset):
         self.data = []
 
         for sample in self.sample_indices:
+            print('Reading sample', self.sample_indices.index(sample) + 1, '/', len(self.sample_indices))
+
             # Read node features
             file_name = data_dir + '/' + str(sample) + '.node_features.pkl'
             f = open(file_name, 'rb')

@@ -30,7 +30,7 @@ pe=lap
 pos_dim=10
 
 # Global information
-load_global_info=1
+load_global_info=0
 
 # Persistence diagram & Neighbor list
 load_pd=1
