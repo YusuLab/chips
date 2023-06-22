@@ -11,40 +11,37 @@ import argparse
 import scipy
 import pickle
 
+# Our data loader
 from torch_geometric.loader import DataLoader
-
 from pyg_dataset import pyg_dataset
 
+# NetlistGNN data loader
+from load_netlistgnn_data import load_data
+
+# Deep Graph Library (DGL)
+import dgl
+
+# To convert from our data to DGL
+from convert_to_dgl import *
+
 # Create train dataset
-train_dataset = pyg_dataset(data_dir = '../../data/2023-03-06_data/', fold_index = 0, split = 'train', target = 'demand')
-test_dataset = pyg_dataset(data_dir = '../../data/2023-03-06_data/', fold_index = 0, split = 'test', target = 'demand')
+# train_dataset = pyg_dataset(data_dir = '../../data/2023-03-06_data/', fold_index = 0, split = 'train', target = 'demand')
+test_dataset = pyg_dataset(data_dir = '../../data/2023-03-06_data/', fold_index = 0, split = 'test', target = 'demand', load_pe = True, num_eigen = 10)
 
 # Data loaders
 batch_size = 1
-train_dataloader = DataLoader(train_dataset, batch_size, shuffle = True)
+# train_dataloader = DataLoader(train_dataset, batch_size, shuffle = True)
 test_dataloader = DataLoader(test_dataset, batch_size, shuffle = False)
 
-print('Number of training examples:', len(train_dataset))
+# print('Number of training examples:', len(train_dataset))
 print('Number of testing examples:', len(test_dataset))
 
-for batch_idx, data in enumerate(train_dataloader):
-    print(batch_idx)
-    print(data)
-    node_dim = data.x.size(1)
-    edge_dim = data.edge_attr.size(1)
-    num_outputs = data.y.size(1)
-    break
-
+# Conversion to DGL format
 for batch_idx, data in enumerate(test_dataloader):
     print(batch_idx)
     print(data)
-    assert node_dim == data.x.size(1)
-    assert edge_dim == data.edge_attr.size(1)
-    assert num_outputs == data.y.size(1)
+    
+    dgl_data = convert_to_dgl(data)
     break
-
-print('Number of node features:', node_dim)
-print('Number of edge features:', edge_dim)
-print('Number of outputs:', num_outputs)
 
 print('Done')
