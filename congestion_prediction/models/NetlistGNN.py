@@ -180,6 +180,8 @@ class NetlistGNN(nn.Module):
         elif self.activation == 'tanh':
             output_predictions = torch.tanh(output_predictions)
 #             output_net_predictions = torch.tanh(output_net_predictions)
+        elif self.activation == 'relu':
+             output_predictions = torch.relu(output_predictions)
         else:
             assert False, f'Undefined activation {self.activation}'
         return output_predictions, output_net_predictions

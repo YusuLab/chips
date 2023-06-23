@@ -21,10 +21,10 @@ seed=123456789
 
 # NetlistGNN
 n_layer=2
-node_feats=16 #64
-net_feats=16 #128
-pin_feats=16
-edge_feats=4
+node_feats=8 #64
+net_feats=8 #128
+pin_feats=8
+edge_feats=2
 
 # Device
 device=cuda

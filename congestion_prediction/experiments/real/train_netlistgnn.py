@@ -62,7 +62,7 @@ def _parse_args():
     parser.add_argument('--net_feats', '-net_feats', type = int, default = 128, help = 'Number of net features')
     parser.add_argument('--pin_feats', '-pin_feats', type = int, default = 16, help = 'Number of pin features')
     parser.add_argument('--edge_feats', '-edge_feats', type = int, default = 4, help = 'Number of edge features')
-    parser.add_argument('--outtype', "--outtype", type = str, default = 'tanh', help = 'Check NetlistGNN for details')
+    parser.add_argument('--outtype', "--outtype", type = str, default = 'relu', help = 'Check NetlistGNN for details')
     parser.add_argument('--recurrent', "--recurrent", type = bool, default = False, help = 'Check NetlistGNN for details')
     parser.add_argument('--topo_conv_type', type = str, default = 'CFCNN', help = 'Check NetlistGNN for details')
     parser.add_argument('--geom_conv_type', type = str, default = 'SAGE', help = 'Check NetlistGNN for details')
@@ -127,6 +127,9 @@ for batch_idx, pyg_data in enumerate(train_dataloader):
     print(batch_idx)
     print(pyg_data)
 
+    # Number of outputs
+    num_outputs = pyg_data.y.size(1)
+
     # Conversion to DGL format
     dgl_data = convert_to_dgl(pyg_data)
 
@@ -137,6 +140,7 @@ for batch_idx, pyg_data in enumerate(train_dataloader):
 
     break
 
+print("Number of outputs:", num_outputs)
 print("Input node features:", in_node_feats)
 print("Input net features:", in_net_feats)
 print("Input pin features:", in_pin_feats)
@@ -409,7 +413,7 @@ with open(args.dir + "/" + args.name + ".truth.npy", 'wb') as f:
 with open(args.dir + "/" + args.name + ".predict.npy", 'wb') as f:
     np.save(f, predict)
 
-method_name = args.gnn_type
+method_name = "NetlistGNN (PKU)"
 design_name = designs_list[args.fold]
 output_name = args.dir + "/" + args.name + ".png"
 
