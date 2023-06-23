@@ -10,7 +10,7 @@ random.seed(123456789)
 data_dir = '../../data/2023-03-06_data/'
 
 # Index of the graph
-graph_index = 10
+graph_index = 26
 
 # Read features
 f = open(data_dir + '/' + str(graph_index) + '.node_features.pkl', 'rb')

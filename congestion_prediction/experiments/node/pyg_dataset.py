@@ -170,10 +170,7 @@ class pyg_dataset(Dataset):
 
         # Filter out input features of validation and testing nodes
         example.x[self.valid_indices, :] = 0
-        example.x[self.test_indices, :] = 0
-        
-        
-        
+        example.x[self.test_indices, :] = 0        
         
         self.example = example
 

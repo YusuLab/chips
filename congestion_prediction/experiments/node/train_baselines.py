@@ -31,7 +31,7 @@ target = 'demand'
 
 # Dataset
 data_dir = '../../data/2023-03-06_data/'
-graph_index = 10
+graph_index = 26
 
 # Analysis
 f = open(data_dir + '/' + str(graph_index) + '.targets.pkl', 'rb')
