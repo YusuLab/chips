@@ -108,10 +108,10 @@ if args.load_pd == 1:
     load_pd = True
 
 if pe == 'lap':
-    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd)
+    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd)
     test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd)
 else:
-    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_global_info = load_global_info, load_pd = load_pd)
+    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_global_info = load_global_info, load_pd = load_pd)
     test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_global_info = load_global_info, load_pd = load_pd)
 
 # Data loaders
@@ -349,7 +349,7 @@ with torch.no_grad():
         target = target.to(device)
 
         # Convert from PyG to DGL
-        dgl_data = convert_to_dgl(data).to(device)
+        dgl_data = convert_to_dgl(data)
 
         # NetlistGNN
         predict, _ = model.forward(

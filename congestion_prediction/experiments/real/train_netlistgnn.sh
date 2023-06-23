@@ -21,8 +21,8 @@ seed=123456789
 
 # NetlistGNN
 n_layer=2
-node_feats=64
-net_feats=128
+node_feats=16 #64
+net_feats=16 #128
 pin_feats=16
 edge_feats=4
 
