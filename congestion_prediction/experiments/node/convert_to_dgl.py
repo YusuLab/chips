@@ -85,8 +85,8 @@ def convert_to_dgl(pyg_data):
     dgl_data.nodes['net'].data['hv'] = pyg_data.x[num_instances :, :]
     dgl_data.nodes['net'].data['degree'] = net_degree
     dgl_data.nodes['net'].data['label'] = net_label
-    dgl_data.edges['pins'].data['he'] = pyg_data.edge_attr
-    dgl_data.edges['pinned'].data['he'] = pyg_data.edge_attr
+    dgl_data.edges['pins'].data['he'] = pyg_data.edge_attr.unsqueeze(dim = 1)
+    dgl_data.edges['pinned'].data['he'] = pyg_data.edge_attr.unsqueeze(dim = 1)
     dgl_data.edges['near'].data['he'] = near_features
 
     return dgl_data

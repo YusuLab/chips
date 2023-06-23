@@ -119,9 +119,9 @@ print('Number of nodes in the training set:', dataset.train_indices.shape[0])
 print('Number of nodes in the validation set:', dataset.valid_indices.shape[0])
 print('Number of nodes in the testing set:', dataset.test_indices.shape[0])
 
-for batch_idx, data in enumerate(dataloader):
+for batch_idx, pyg_data in enumerate(dataloader):
     print(batch_idx)
-    print(data)
+    print(pyg_data)
     
     # Number of outputs
     num_outputs = pyg_data.y.size(1)

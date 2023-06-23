@@ -96,8 +96,7 @@ class pyg_dataset(Dataset):
             edge_index = torch.Tensor(dictionary['edge_index']).long()
             x = instance_features
 
-        # PyG data
-        
+        # PyG data        
         example = Data()
         example.__num_nodes__ = x.size(0)
         example.x = x
@@ -107,7 +106,7 @@ class pyg_dataset(Dataset):
         
         print(example, graph_index)
 
-        with open(f"../../data/2023-03-06_data/{graph_index}.weight_demand.pickle", "rb") as f:
+        with open(self.data_dir + "/" + str(graph_index) + ".weight_demand.pickle", "rb") as f:
             weight_dict = pickle.load(f)
         
         targets = y

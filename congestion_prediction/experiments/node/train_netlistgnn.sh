@@ -15,9 +15,9 @@ mkdir $target
 cd ..
 dir=./$program/$target/
 
-data_dir=../../data/2023-03-06_data/
+data_dir=/data/zluo/hetero_net/data/2023-03-06_data/
 
-num_epoch=1
+num_epoch=100
 batch_size=1
 learning_rate=0.001
 seed=123456789
