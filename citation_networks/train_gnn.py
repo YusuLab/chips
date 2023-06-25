@@ -42,14 +42,16 @@ model = GNN(
 optimizer = torch.optim.Adam(model.parameters(), lr = 0.01, weight_decay = 5e-3)
 
 def train():
-    prediction = model(data)
     optimizer.zero_grad()
+
+    prediction = torch.softmax(model(data), dim = 1)
 
     prediction = prediction[data.train_mask]
     target = data.y[data.train_mask]
     
     loss = F.nll_loss(prediction, target)
     loss.backward()
+    
     optimizer.step()
 
 
