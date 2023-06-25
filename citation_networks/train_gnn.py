@@ -12,7 +12,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # Dataset
 dataset = 'Cora'
 transform = T.Compose([
-    T.RandomNodeSplit(num_val = 500, num_test = 500),
+    T.RandomNodeSplit(num_val = 100, num_test = 100),
     T.TargetIndegree(),
 ])
 dataset = Planetoid(root = './', name = 'Cora', transform = transform)
@@ -39,7 +39,7 @@ model = GNN(
     cfg_posenc = None,
     device = device).to(device)
 
-optimizer = torch.optim.Adam(model.parameters(), lr = 0.01, weight_decay = 5e-3)
+optimizer = torch.optim.Adam(model.parameters(), lr = 0.001) #, weight_decay = 5e-3)
 
 def train():
     optimizer.zero_grad()
@@ -50,6 +50,7 @@ def train():
     target = data.y[data.train_mask]
     
     loss = F.nll_loss(prediction, target)
+    print(loss)
     loss.backward()
     
     optimizer.step()
