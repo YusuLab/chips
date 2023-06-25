@@ -132,7 +132,7 @@ def test():
     return accs
 
 
-for epoch in range(1, 201):
+for epoch in range(1, 2001):
     train()
     train_acc, test_acc = test()
     print(f'Epoch: {epoch:03d}, Train: {train_acc:.4f}, Test: {test_acc:.4f}')

@@ -39,7 +39,7 @@ model = GNN(
     cfg_posenc = None,
     device = device).to(device)
 
-optimizer = torch.optim.Adam(model.parameters(), lr = 0.001) #, weight_decay = 5e-3)
+optimizer = torch.optim.Adam(model.parameters(), lr = 1e-4) #, weight_decay = 5e-3)
 
 def train():
     optimizer.zero_grad()
@@ -67,7 +67,7 @@ def test():
     return accs
 
 
-for epoch in range(1, 201):
+for epoch in range(1, 2001):
     train()
     train_acc, test_acc = test()
     print(f'Epoch: {epoch:03d}, Train: {train_acc:.4f}, Test: {test_acc:.4f}')
