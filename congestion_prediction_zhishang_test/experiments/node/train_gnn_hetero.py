@@ -6,6 +6,7 @@ from torch.optim import Adam, Adagrad
 from torch_geometric.utils import degree
 import pickle
 from torch import optim
+
 # For visualization
 from utils import *
 
@@ -14,7 +15,7 @@ from utils import *
 
 # PyTorch geometric data loader
 from torch_geometric.loader import DataLoader
-from pyg_dataset_net import pyg_dataset
+from pyg_dataset import pyg_dataset
 import numpy as np
 import os
 import time
@@ -24,7 +25,7 @@ from tqdm import tqdm
 
 # Model
 import sys
-sys.path.insert(1, '../../models_net/')
+sys.path.insert(1, '../../models_inst/')
 from gnn_hetero import GNN # Heterogeneous GNN
 
 # Create a configuration for position encodings (including SignNet)
@@ -56,8 +57,9 @@ def _parse_args():
     parser.add_argument('--gnn_type', '-gnn_type', type = str, default = 'gin', help = 'GNN type')
     parser.add_argument('--load_global_info', '-load_global_info', type = int, default = 0, help = 'Global information')
     parser.add_argument('--load_pd', '-load_pd', type = int, default = 0, help = 'Persistence diagram & Neighbor list')
-    parser.add_argument('--fold', '-fold', type = int, default = 0, help = 'Fold index in cross-validation')
+    parser.add_argument('--graph_index', '-graph_index', type = int, default = 0, help = 'Index of the graph')
     parser.add_argument('--device', '-device', type = str, default = 'cpu', help = 'cuda/cpu')
+    #parser.add_argument('--loss_type', '-loss_type', type = str, default = 'mse', help = 'mse/weighted_mse')
     args = parser.parse_args()
     return args
 
@@ -89,6 +91,11 @@ if args.gnn_type == "hyper":
 else:
     sparse = False
 
+if args.virtual_node == 1:
+    virtual_node = True
+else:
+    virtual_node = False
+
 if sparse:
     from pyg_dataset_sparse import *
 # Dataset
@@ -119,23 +126,19 @@ if args.load_pd == 1:
     load_pd = True
 
 if pe == 'lap':
-    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd)
-    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd)
+    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd)
 else:
-    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_global_info = load_global_info, load_pd = load_pd, load_pe = False, vn=args.virtual_node)
-    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_global_info = load_global_info, load_pd = load_pd, load_pe = False, vn=args.virtual_node)
+    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_global_info = load_global_info, load_pd = load_pd, concat = False)
 
 # Data loaders
 batch_size = args.batch_size
-print(batch_size)
-train_dataloader = DataLoader(train_dataset, batch_size, shuffle = False)
-valid_dataloader = DataLoader(test_dataset, batch_size, shuffle = False)
-test_dataloader = DataLoader(test_dataset, batch_size, shuffle = False)
+dataloader = DataLoader(dataset, batch_size, shuffle = False)
 
-print('Number of training examples:', len(train_dataset))
-print('Number of testing examples:', len(test_dataset))
+print('Number of nodes in the training set:', dataset.train_indices.shape[0])
+print('Number of nodes in the validation set:', dataset.valid_indices.shape[0])
+print('Number of nodes in the testing set:', dataset.test_indices.shape[0])
 
-for batch_idx, data in enumerate(train_dataloader):
+for batch_idx, data in enumerate(dataloader):
     print(batch_idx)
     print(data)
     node_dim = data.x.size(1)
@@ -146,15 +149,6 @@ for batch_idx, data in enumerate(train_dataloader):
         edge_dim = data.edge_attr.size(1)
         net_dim = data.x_net.size(1)
     num_outputs = data.y.size(1)
-    break
-
-for batch_idx, data in enumerate(test_dataloader):
-    print(batch_idx)
-    print(data)
-    assert node_dim == data.x.size(1)
-    assert edge_dim == 1#data.edge_attr.size(1)
-    assert num_outputs == data.y.size(1)
-    break
 
 print('Number of node features:', node_dim)
 print('Number of edge features:', edge_dim)
@@ -168,7 +162,7 @@ if pe == 'lap':
 
 # Statistics
 y = []
-for batch_idx, data in enumerate(train_dataloader):
+for batch_idx, data in enumerate(dataloader):
     y.append(data.y.detach().numpy())
 y = np.concatenate(y)
 
@@ -183,14 +177,13 @@ print('y mean:', y_mean)
 print('y std:', y_std)
 
 # Init model and optimizer
-if args.virtual_node == 1:
-    virtual_node = True
-else:
-    virtual_node = False
 gnn_type = args.gnn_type
 
 print('GNN type:', gnn_type)
 print('Virtual node:', virtual_node)
+
+# with open(f"{args.data_dir}/{args.graph_index}.net_dict.pkl", "rb") as f:
+#     net_dict = pickle.load(f)
 
 if gnn_type == 'pna':
     aggregators = ['mean', 'min', 'max', 'std']
@@ -205,7 +198,7 @@ if gnn_type == 'pna':
 
     model = GNN(gnn_type = gnn_type, num_tasks = num_outputs, virtual_node = virtual_node, num_layer = args.n_layers, emb_dim = args.hidden_dim,
             aggregators = aggregators, scalers = scalers, deg = deg, edge_dim = edge_dim, 
-            use_signnet = use_signnet, node_dim = node_dim, net_dim = net_dim, cfg_posenc = config,
+            use_signnet = use_signnet, node_dim = node_dim, net_dim = net_dim,  cfg_posenc = config,
             device = device).to(device)
 else:
     model = GNN(gnn_type = gnn_type, num_tasks = num_outputs, virtual_node = virtual_node, num_layer = args.n_layers, emb_dim = args.hidden_dim,
@@ -219,9 +212,6 @@ print('Number of learnable parameters:', num_parameters)
 LOG.write('Number of learnable parameters: ' + str(num_parameters) + '\n')
 print('Done with model creation')
 
-
-
-
 # Test mode
 if args.test_mode == 1:
     print("Skip the training")
@@ -229,20 +219,6 @@ if args.test_mode == 1:
 else:
     num_epoch = args.num_epoch
 
-# Login to Wandb
-
-wandb.init(
-    # set the wandb project where this run will be logged
-    project="netlist_cross_designs",
-
-    # track hyperparameters and run metadata
-    config={
-    "learning_rate": args.learning_rate,
-    "architecture": gnn_type,
-    "dataset": args.fold,
-    "epochs": num_epoch,
-    }
-)
 
 # Train model
 best_mae = 1e9
@@ -258,12 +234,11 @@ for epoch in range(num_epoch):
     nBatch = 0
     sum_error = 0.0
     num_samples = 0
-    
-    for batch_idx, data in enumerate(train_dataloader):
-        #print(batch_idx, data)
-        
+
+    for batch_idx, data in enumerate(dataloader):
         data = data.to(device = device)
         target = (data.y - y_mean) / y_std
+        #weights = data.weights.to(device = device)
 
         if pe == 'lap':
             data.x = torch.cat([data.x, data.evects], dim = 1)
@@ -274,14 +249,22 @@ for epoch in range(num_epoch):
         if gnn_type == 'pna':
             data.edge_attr = data.edge_attr.type(torch.FloatTensor).to(device = device)
 
+        # Model
         predict = model(data)
-        predict = predict[: target.size(0), :]
+
+        # Train indices
+        predict = predict[dataset.train_indices, :]
+        target = target[dataset.train_indices, :]
+        #weights = weights[dataset.train_indices]
 
         optimizer.zero_grad()
 
         # Mean squared error loss
+            
+        #mse_loss = weighted_mse(predict.view(-1), target.view(-1), weights)
         loss = F.mse_loss(predict.view(-1), target.view(-1), reduction = 'mean')
- 
+        mse_loss = loss
+
         loss.backward()
         optimizer.step()
         
@@ -292,14 +275,14 @@ for epoch in range(num_epoch):
         num_samples += predict.size(0)
 
         if batch_idx % 10 == 0:
-            print('Batch', batch_idx, '/', len(train_dataloader),': Loss =', loss.item())
-            LOG.write('Batch ' + str(batch_idx) + '/' + str(len(train_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
+            print('Batch', batch_idx, '/', len(dataloader),': Loss =', loss.item())
+            LOG.write('Valid Batch ' + str(batch_idx) + '/' + str(len(dataloader)) + ': Loss = ' + str(loss.item()) + ' MSE loss = ' + str(mse_loss.item()) + '\n')
 
     train_mae = sum_error / (num_samples * num_outputs)
     avg_loss = total_loss / nBatch
 
-    print('Train average loss:', avg_loss)
-    LOG.write('Train average loss: ' + str(avg_loss) + '\n')
+    print('Train average loss:', train_mae)
+    LOG.write('Train average loss: ' + str(train_mae) + '\n')
     print('Train MAE:', train_mae)
     LOG.write('Train MAE: ' + str(train_mae) + '\n')
     print('Train MAE (original scale):', train_mae * y_std)
@@ -307,7 +290,6 @@ for epoch in range(num_epoch):
     print("Train time =", "{:.5f}".format(time.time() - t))
     LOG.write("Train time = " + "{:.5f}".format(time.time() - t) + "\n")
 
-    wandb.log({"train_mse":avg_loss, "train_mae":train_mae})
 
     # Validation
     t = time.time()
@@ -318,9 +300,10 @@ for epoch in range(num_epoch):
     with torch.no_grad():
         sum_error = 0.0
         num_samples = 0
-        for batch_idx, data in enumerate(valid_dataloader):
+        for batch_idx, data in enumerate(dataloader):
             data = data.to(device = device)
             target = (data.y - y_mean) / y_std
+            #weights = data.weights.to(device = device)
 
             if pe == 'lap':
                 data.x = torch.cat([data.x, data.evects], dim = 1)
@@ -332,10 +315,15 @@ for epoch in range(num_epoch):
                 data.edge_attr = data.edge_attr.type(torch.FloatTensor).to(device = device)
 
             predict = model(data)
-            predict = predict[: target.size(0), :]
+            
+            # Validation indices
+            predict = predict[dataset.valid_indices, :]
+            target = target[dataset.valid_indices, :]
 
             # Mean squared error loss
+            #mse_loss = weighted_mse(predict.view(-1), target.view(-1), weights)
             loss = F.mse_loss(predict.view(-1), target.view(-1), reduction = 'mean')
+            mse_loss = loss
 
             total_loss += loss.item()
             nBatch += 1
@@ -344,14 +332,14 @@ for epoch in range(num_epoch):
             num_samples += predict.size(0)
              
             if batch_idx % 10 == 0:
-                print('Valid Batch', batch_idx, '/', len(valid_dataloader),': Loss =', loss.item())
-                LOG.write('Valid Batch ' + str(batch_idx) + '/' + str(len(valid_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
+                print('Valid Batch', batch_idx, '/', len(dataloader),': Loss =', loss.item())
+                LOG.write('Valid Batch ' + str(batch_idx) + '/' + str(len(dataloader)) + ': Loss = ' + str(loss.item()) + ' MSE loss = ' + str(mse_loss.item()) + '\n')
 
     valid_mae = sum_error / (num_samples * num_outputs)
     avg_loss = total_loss / nBatch
 
-    print('Valid average loss:', avg_loss)
-    LOG.write('Valid average loss: ' + str(avg_loss) + '\n')
+    print('Valid average loss:', valid_mae)
+    LOG.write('Valid average loss: ' + str(valid_mae) + '\n')
     print('Valid MAE:', valid_mae)
     LOG.write('Valid MAE: ' + str(valid_mae) + '\n')
     print('Valid MAE (original scale):', valid_mae * y_std)
@@ -359,8 +347,7 @@ for epoch in range(num_epoch):
     print("Valid time =", "{:.5f}".format(time.time() - t))
     LOG.write("Valid time = " + "{:.5f}".format(time.time() - t) + "\n")
 
-    wandb.log({"valid_mse":avg_loss, "valid_mae":valid_mae})
-
+    
     if valid_mae < best_mae:
         best_mae = valid_mae
         print('Current best MAE updated:', best_mae)
@@ -400,7 +387,7 @@ y_hat = []
 with torch.no_grad():
     sum_error = 0.0
     num_samples = 0
-    for batch_idx, data in enumerate(test_dataloader):
+    for batch_idx, data in enumerate(dataloader):
         data = data.to(device = device)
         target = (data.y - y_mean) / y_std
 
@@ -412,9 +399,14 @@ with torch.no_grad():
 
         if gnn_type == 'pna':
             data.edge_attr = data.edge_attr.type(torch.FloatTensor).to(device = device)
-
+        
+        print(data)
+        # Model
         predict = model(data)
-        predict = predict[: target.size(0), :]
+        
+        # Test indices
+        predict = predict[dataset.test_indices, :]
+        target = target[dataset.test_indices, :]
         
         # Mean squared error loss
         loss = F.mse_loss(predict.view(-1), target.view(-1), reduction = 'mean')
@@ -429,8 +421,8 @@ with torch.no_grad():
         num_samples += predict.size(0)
 
         if batch_idx % 10 == 0:
-            print('Test Batch', batch_idx, '/', len(test_dataloader),': Loss =', loss.item())
-            LOG.write('Test Batch ' + str(batch_idx) + '/' + str(len(test_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
+            print('Test Batch', batch_idx, '/', len(dataloader),': Loss =', loss.item())
+            LOG.write('Test Batch ' + str(batch_idx) + '/' + str(len(dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
 
 test_mae = sum_error / (num_samples * num_outputs)
 avg_loss = total_loss / nBatch
@@ -447,15 +439,6 @@ print("Test time =", "{:.5f}".format(time.time() - t))
 LOG.write("Test time = " + "{:.5f}".format(time.time() - t) + "\n")
 
 # Visualiation
-designs_list = [
-    'superblue1',
-    'superblue2',
-    'superblue3',
-    'superblue4',
-    'superblue18',
-    'superblue19'
-]
-
 truth = torch.cat(y_test, dim = 0).cpu().detach().numpy() * y_std + y_mean
 predict = torch.cat(y_hat, dim = 0).cpu().detach().numpy() * y_std + y_mean
 
@@ -466,11 +449,9 @@ with open(args.dir + "/" + args.name + ".predict.npy", 'wb') as f:
     np.save(f, predict)
 
 method_name = args.gnn_type
-design_name = designs_list[args.fold]
+design_name = dataset.design_name
 output_name = args.dir + "/" + args.name + ".png"
-
 plot_figure(truth, predict, method_name, design_name, output_name)
 print('Done')
 
 LOG.close()
-wandb.finish()
