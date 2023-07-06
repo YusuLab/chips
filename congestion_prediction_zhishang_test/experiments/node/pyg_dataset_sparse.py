@@ -6,7 +6,7 @@ from torch_geometric.data import Data
 import numpy as np
 import pickle
 
-class pyg_dataset_sparse(Dataset):
+class pyg_dataset(Dataset):
     def __init__(self, data_dir, graph_index, target, load_pe = False, num_eigen = 5, load_global_info = True, load_pd = False, graph_rep = 'star', vn = True, debug = False):
         super().__init__()
         self.data_dir = data_dir
@@ -22,7 +22,7 @@ class pyg_dataset_sparse(Dataset):
 
         # Split
         if not debug:
-            file_name = str(graph_index) + '.split_sparse.pkl'
+            file_name = str(graph_index) + '.split_net.pkl'
             f = open(file_name, 'rb')
             dictionary = pickle.load(f)
             f.close()

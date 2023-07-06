@@ -94,6 +94,7 @@ else:
 if sparse:
     from pyg_dataset_sparse import *
 
+print(sparse, args.gnn_type)
 # Dataset
 print('Create data loaders')
 pe = args.pe
@@ -130,7 +131,7 @@ else:
 if pe == 'lap':
     dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd)
 else:
-    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_global_info = load_global_info, load_pd = load_pd, concat = False)
+    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_global_info = load_global_info, load_pd = load_pd)
 
 # Data loaders
 batch_size = args.batch_size
