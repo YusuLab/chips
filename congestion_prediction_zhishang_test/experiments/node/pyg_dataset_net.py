@@ -77,7 +77,7 @@ class pyg_dataset(Dataset):
 
         edge_attr = torch.Tensor(dictionary['edge_attr']).float().unsqueeze(dim = 1).float()
         edge_index = torch.cat((instance_idx, net_idx), dim = 1)
-        
+        edge_index = torch.transpose(edge_index, 0, 1)
         x = instance_features
 
         # PyG data
@@ -160,6 +160,8 @@ class pyg_dataset(Dataset):
 
             example.x = torch.cat([example.x, pd, neighbor_list], dim = 1)
 
+        
+        
         if concat:
             node_feat = example.x
             net_feat = example.x_net
@@ -168,7 +170,7 @@ class pyg_dataset(Dataset):
             node_feat = torch.cat([fill_node_feat, fill_net_feat], dim=0)
             example.x = node_feat
             example.x_net = None
-
+          
         self.example = example
 
         print(example, graph_index)
