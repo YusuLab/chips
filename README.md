@@ -2,19 +2,26 @@
 
 This is the github repository for the codes for paper: "DE-HNN: An effective neural model for Circuit Netlist representation"
 
-## How to generate data
+## How to Download Netlist Data
 
-Raw data is available at [url]. After download the raw data, please extract and put the raw data directory to "/de_hnn/data/" directory. 
+Raw data is available at [url]. 
 
-After that, please run following command to generate the full processed dataset. The whole process can last for hours. 
+After downloading the raw data, please extract and put the raw data directory to "/de_hnn/data/" directory.
+
+After that, please run following command to generate the full processed dataset. The whole process can last for hours.
 
 ```commandline
 source run_all_python_scripts.sh
-``` 
+```
+### Skip Processing Data
+
+If one does not want to process the raw data for any reason but just need the processed data, the full processed data is also available at [url].
+
+After downloading the processed data, please extract and put the data directory to "/de_hnn/data/" directory.
 
 ## How to train 
 
-After the data is created, the experiments can be run following the instrcutions below. 
+After the data is processed, the experiments can be run following the instrcutions below. 
 
 ### Simple Test
 
