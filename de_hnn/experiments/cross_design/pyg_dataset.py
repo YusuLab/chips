@@ -9,7 +9,7 @@ import pickle
 from tqdm import tqdm
 
 class pyg_dataset(Dataset):
-    def __init__(self, data_dir, fold_index, split, target, load_pe = False, num_eigen = 10, load_global_info = True, load_pd = False, total_samples = 50, vn = False, concat=False):
+    def __init__(self, data_dir, fold_index, split, target, load_pe = False, num_eigen = 10, load_global_info = True, load_pd = False, design = 19, pl = 0, vn = False, concat=False, net=False):
         super().__init__()
         self.data_dir = data_dir
         self.fold_index = fold_index
@@ -25,11 +25,13 @@ class pyg_dataset(Dataset):
         self.load_pd = load_pd
 
         # Read cross-validation
-        file_name = data_dir + '/9_fold_cross_validation.pkl'
+        pl = bool(pl)
+        print(f"Placement Information {pl}")
+        file_name = data_dir + f'/9_fold_cross_validation_{design}.pkl'
         f = open(file_name, 'rb')
         dictionary = pickle.load(f)
         f.close()
-        folds = dictionary['folds']
+        #folds = dictionary['folds']
         fix_folds = dictionary['fix_folds']
 
         # Take the sample indices
@@ -67,7 +69,10 @@ class pyg_dataset(Dataset):
             num_instances = dictionary['num_instances']
             num_nets = dictionary['num_nets']
             instance_features = torch.Tensor(dictionary['instance_features'])
-            instance_features = instance_features[:, 2:]
+            
+            if not pl:
+                instance_features = instance_features[:, 2:]
+            
             net_features = torch.zeros(num_nets, instance_features.size(1))
 
             # Read learning targets
@@ -77,7 +82,7 @@ class pyg_dataset(Dataset):
             f.close()
 
             demand = torch.Tensor(dictionary['demand'])
-            #capacity = torch.Tensor(dictionary['capacity'])
+            capacity = torch.Tensor(dictionary['capacity'])
 
             if self.target == 'demand':
                 y = demand.unsqueeze(dim = 1)
@@ -117,11 +122,11 @@ class pyg_dataset(Dataset):
 
             # Load capacity
             #if graph_index < 50:
-            #capacity = capacity.unsqueeze(dim = 1)
-            #norm_cap = (capacity - torch.min(capacity)) / (torch.max(capacity) - torch.min(capacity))
-            #capacity_features = torch.cat([capacity, torch.sqrt(capacity), norm_cap, torch.sqrt(norm_cap), torch.square(norm_cap), torch.sin(norm_cap), torch.cos(norm_cap)], dim = 1)
-            
-            #example.x = torch.cat([example.x, capacity_features], dim = 1)
+            if pl:
+                capacity = capacity.unsqueeze(dim = 1)
+                norm_cap = (capacity - torch.min(capacity)) / (torch.max(capacity) - torch.min(capacity))
+                capacity_features = torch.cat([capacity, torch.sqrt(capacity), norm_cap, torch.sqrt(norm_cap), torch.square(norm_cap), torch.sin(norm_cap), torch.cos(norm_cap)], dim = 1)
+                example.x = torch.cat([example.x, capacity_features], dim = 1)
 
             example.num_instances = num_instances
 
@@ -147,26 +152,38 @@ class pyg_dataset(Dataset):
             d = pickle.load(f)
             f.close()
 
-            example.cell_degrees = d['cell_degrees']
-            example.net_degrees = d['net_degrees']
+            example.cell_degrees = torch.tensor(d['cell_degrees'])
+            example.net_degrees = torch.tensor(d['net_degrees'])
 
-            if vn:
-                file_name = data_dir + '/' + str(graph_index) + '.star_part_dict.pkl'
+            #if net:
+                #example.x_net = torch.cat([capacity_features, example.net_degrees.unsqueeze(dim = 1)], dim = 1)
+            #else:
+            example.x_net = example.net_degrees.unsqueeze(dim = 1)
+
+            if vn:       
+                if pl:       
+                    file_name = data_dir + '/' + str(first_index) + '.metis_part_dict.pkl'
+                else:
+                    file_name = data_dir + '/' + str(graph_index) + '.star_part_dict.pkl'
                 f = open(file_name, 'rb')
                 part_dict = pickle.load(f)
                 f.close()
-
+      
                 part_id_lst = []
-
+      
                 for idx in range(len(example.x)):
                     part_id_lst.append(part_dict[idx])
-
+      
                 part_id = torch.LongTensor(part_id_lst)
-
-                example.part_id = part_id
-
+                
                 example.num_vn = len(torch.unique(part_id))
-
+      
+                top_part_id = torch.Tensor([0 for idx in range(example.num_vn)]).long()
+      
+                example.num_top_vn = len(torch.unique(top_part_id))
+      
+                example.part_id = part_id
+                example.top_part_id = top_part_id
             
             # Load positional encoding
             if self.load_pe == True:
@@ -176,26 +193,25 @@ class pyg_dataset(Dataset):
                 f.close()
 
                 example.evects = torch.Tensor(dictionary['evects'])#[:num_instances])
-                example.evals = torch.Tensor(dictionary['evals'])#[:num_instances])
+                evals = torch.Tensor(dictionary['evals'])#[:num_instances])
 
             # Load global information
             if self.load_global_info == True:
-                #file_name = data_dir + '/' + str(sample) + '.global_information.pkl'
-                #f = open(file_name, 'rb')
-                #dictionary = pickle.load(f)
-                #f.close()
-
-                #core_util = dictionary['core_utilization']
-                #global_info = torch.Tensor(np.array([core_util, np.sqrt(core_util), core_util ** 2, np.cos(core_util), np.sin(core_util)]))
-                #num_nodes = example.x.size(0)
-                #global_info = torch.cat([global_info.unsqueeze(dim = 0) for i in range(num_nodes)], dim = 0)
-
-                #example.x = torch.cat([example.x, global_info], dim = 1)
-                example.x_net = torch.Tensor(example.net_degrees).unsqueeze(dim=1)
+                num_nodes = example.x.size(0)
+                global_info = torch.Tensor(np.concatenate([[num_nodes], evals]))
+                global_info = torch.cat([global_info.unsqueeze(dim = 0) for i in range(num_nodes)], dim = 0)
+                example.x = torch.cat([example.x, global_info], dim = 1)
 
              # Load persistence diagram and neighbor list
+
+            if pl:
+                first_index = graph_index
+                neighbor_f = 'node_neighbors_pl/'
+            else:
+                neighbor_f = 'node_neighbors/'
+
             if self.load_pd == True:
-                file_name = data_dir + '/' + str(first_index) + '.node_neighbor_features.pkl'
+                file_name = data_dir + '/' + neighbor_f + str(first_index) + '.node_neighbor_features.pkl'
                 f = open(file_name, 'rb')
                 dictionary = pickle.load(f)
                 f.close()
@@ -209,7 +225,7 @@ class pyg_dataset(Dataset):
                 example.x = torch.cat([example.x, pd, neighbor_list], dim = 1)
                 
             else:
-                file_name = data_dir + '/' + str(first_index) + '.node_neighbor_features.pkl'
+                file_name = data_dir + '/' + neighbor_f + str(first_index) + '.node_neighbor_features.pkl'
                 f = open(file_name, 'rb')
                 dictionary = pickle.load(f)
                 f.close()

@@ -55,7 +55,7 @@ def _parse_args():
     parser.add_argument('--load_pd', '-load_pd', type = int, default = 0, help = 'Persistence diagram & Neighbor list')
     parser.add_argument('--graph_index', '-graph_index', type = int, default = 0, help = 'Index of the graph')
     parser.add_argument('--device', '-device', type = str, default = 'cpu', help = 'cuda/cpu')
-    #parser.add_argument('--loss_type', '-loss_type', type = str, default = 'mse', help = 'mse/weighted_mse')
+    parser.add_argument('--split', '-split', type = int, default = 1, help = 'Index of the split')
     
     # For NetlistGNN
     parser.add_argument('--n_layer', '-n_layer', type = int, default = 2, help = 'Number of layers')
@@ -110,9 +110,9 @@ if args.load_pd == 1:
     load_pd = True
 
 if pe == 'lap':
-    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd)
+    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, split = args.split, net=False)
 else:
-    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_global_info = load_global_info, load_pd = load_pd)
+    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_global_info = load_global_info, load_pd = load_pd, split = args.split, net=False)
 
 # Data loaders
 batch_size = args.batch_size

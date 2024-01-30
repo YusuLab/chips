@@ -49,7 +49,8 @@ def _parse_args():
     parser.add_argument('--load_pd', '-load_pd', type = int, default = 0, help = 'Persistence diagram & Neighbor list')
     parser.add_argument('--graph_index', '-graph_index', type = int, default = 0, help = 'Index of the graph')
     parser.add_argument('--device', '-device', type = str, default = 'cpu', help = 'cuda/cpu')
-    #parser.add_argument('--loss_type', '-loss_type', type = str, default = 'mse', help = 'mse/weighted_mse')
+    parser.add_argument('--split', '-split', type = int, default = 1, help = 'Index of the split')
+    parser.add_argument('--pl', '-pl', type = int, default = 0, help = 'use placement info or not')
     args = parser.parse_args()
     return args
 
@@ -91,7 +92,7 @@ np.random.seed(args.seed)
 device = args.device
 print(device)
 
-if args.gnn_type == "hyper" or args.gnn_type == 'hypernodir' or args.gnn_type == 'sota':
+if args.gnn_type not in ["gcn", "gat"]:
     sparse = True
 else:
     sparse = False
@@ -141,9 +142,9 @@ if args.load_pd == 1:
 
     
 if pe == 'lap':
-    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, concat = concat)
+    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, concat = concat, split = args.split, pl = args.pl)
 else:
-    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, concat = concat)
+    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, concat = concat, split = args.split)
 
 # Data loaders
 batch_size = args.batch_size
@@ -497,16 +498,15 @@ else:
     truth = torch.concat(y_test, dim=0).cpu().detach().numpy() * y_std + y_mean
     predict = torch.concat(y_hat, dim=0).cpu().detach().numpy() * y_std + y_mean
 
-
 with open(args.dir + "/" + args.name + ".truth.npy", 'wb') as f:
      np.save(f, truth)
 
 with open(args.dir + "/" + args.name + ".predict.npy", 'wb') as f:
      np.save(f, predict)
 
-method_name = args.gnn_type
-design_name = dataset.design_name
-output_name = args.dir + "/" + args.name + ".png"
+#method_name = args.gnn_type
+#design_name = dataset.design_name
+#output_name = args.dir + "/" + args.name + ".png"
 # plot_figure(truth, predict, method_name, design_name, output_name)
 print('Done')
 

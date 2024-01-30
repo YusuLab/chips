@@ -78,7 +78,7 @@ def convert_to_dgl(pyg_data):
     cell_degree = torch.tensor(pyg_data.cell_degrees)[0].unsqueeze(dim=1)
     
     n_node = num_instances
-    node_hv = torch.cat([pyg_data.x, cell_degree], dim=1)
+    node_hv = torch.cat([pyg_data.x, pyg_data.evects[:num_instances], cell_degree], dim=1)
     
     homo_graph = add_self_loop(dgl.graph((near_idx_1, near_idx_2), num_nodes=n_node))
     homo_graph.ndata['feat'] = node_hv[:n_node, :]
@@ -101,13 +101,13 @@ def convert_to_dgl(pyg_data):
     )
     
     
-    net_hv = torch.cat([net_degree, pyg_data.x_net], dim=1)
+    net_hv = torch.cat([net_degree], dim=1)
     
     # Node & Edge features
-    dgl_data.nodes['node'].data['hv'] = torch.cat([homo_graph.ndata['feat'], pyg_data.evects[ : num_instances, :], extra], dim=1)
-    dgl_data.nodes['node'].data['pos_code'] = pyg_data.evects[ : num_instances, :]
+    dgl_data.nodes['node'].data['hv'] = torch.cat([homo_graph.ndata['feat'], extra], dim=1)
+    #dgl_data.nodes['node'].data['pos_code'] = pyg_data.evects[ : num_instances, :]
     dgl_data.nodes['net'].data['hv'] = net_hv
-    dgl_data.nodes['net'].data['degree'] = net_degree
+    #dgl_data.nodes['net'].data['degree'] = net_degree
     dgl_data.nodes['net'].data['label'] = net_label
     dgl_data.edges['pins'].data['he'] = torch.ones(net_idx.size(0), 1)
     dgl_data.edges['pinned'].data['he'] = torch.ones(net_idx.size(0), 1)

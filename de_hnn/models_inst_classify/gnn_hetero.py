@@ -27,7 +27,7 @@ class GNN(torch.nn.Module):
                     num_nodes = None, # Number of nodes
 
                     device = 'cuda', 
-                    
+                    incidence = None,
                     single = False
                 ):
         '''
@@ -62,7 +62,7 @@ class GNN(torch.nn.Module):
                     aggregators = aggregators, scalers = scalers, deg = deg, edge_dim = edge_dim, 
                     use_signnet = use_signnet, node_dim = node_dim, cfg_posenc = cfg_posenc,
                     num_nodes = num_nodes,
-                    device = device).to(device = device)
+                    device = device, incidence=incidence).to(device = device)
         
         # Final node-level prediction
         if self.JK == "concat":

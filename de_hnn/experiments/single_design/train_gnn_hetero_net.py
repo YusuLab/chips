@@ -59,7 +59,8 @@ def _parse_args():
     parser.add_argument('--load_pd', '-load_pd', type = int, default = 0, help = 'Persistence diagram & Neighbor list')
     parser.add_argument('--graph_index', '-graph_index', type = int, default = 0, help = 'Index of the graph')
     parser.add_argument('--device', '-device', type = str, default = 'cpu', help = 'cuda/cpu')
-    #parser.add_argument('--loss_type', '-loss_type', type = str, default = 'mse', help = 'mse/weighted_mse')
+    parser.add_argument('--split', '-split', type = int, default = 1, help = 'Index of the split')
+    parser.add_argument('--pl', '-pl', type = int, default = 0, help = 'use placement info or not')
     args = parser.parse_args()
     return args
 
@@ -86,7 +87,7 @@ np.random.seed(args.seed)
 device = args.device
 print(device)
 
-if args.gnn_type == "hyper" or args.gnn_type == 'hypernodir' or args.gnn_type == 'sota':
+if args.gnn_type not in ['gcn', 'gat']:
     sparse = True
 else:
     sparse = False
@@ -94,7 +95,7 @@ else:
 if sparse:
     from pyg_dataset_sparse import *
 
-print(sparse, args.gnn_type)
+print("Sparse", sparse, args.gnn_type)
 # Dataset
 print('Create data loaders')
 pe = args.pe
@@ -136,12 +137,12 @@ else:
 print("single:", single)
 
 if pe == 'lap':
-    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, net=True, concat=False)
+    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, net=True, split = args.split, pl = args.pl)
 else:
     if sparse:
-        dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, net=True)
+        dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, net=True, split = args.split)
     else:
-        dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node)
+        dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, net=True, split = args.split)
 
 # Data loaders
 batch_size = args.batch_size

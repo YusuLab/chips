@@ -100,8 +100,8 @@ def convert_to_dgl(pyg_data):
     )
     
     # Node & Edge features
-    dgl_data.nodes['node'].data['hv'] = torch.cat([homo_graph.ndata['feat'], extra, pyg_data.evects[ : num_instances, :]], dim=1)
-    dgl_data.nodes['node'].data['pos_code'] = pyg_data.evects[ : num_instances, :]
+    dgl_data.nodes['node'].data['hv'] = torch.cat([homo_graph.ndata['feat'], extra, pyg_data.evects[ : num_instances, :], pyg_data.evects[ : num_instances, :]], dim=1)
+    #dgl_data.nodes['node'].data['pos_code'] = pyg_data.evects[ : num_instances, :]
     dgl_data.nodes['net'].data['hv'] = net_degree
     dgl_data.nodes['net'].data['degree'] = net_degree
     dgl_data.nodes['net'].data['label'] = net_label

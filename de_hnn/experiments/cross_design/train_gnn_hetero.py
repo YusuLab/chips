@@ -50,6 +50,8 @@ def _parse_args():
     parser.add_argument('--load_pd', '-load_pd', type = int, default = 0, help = 'Persistence diagram & Neighbor list')
     parser.add_argument('--fold', '-fold', type = int, default = 0, help = 'Fold index in cross-validation')
     parser.add_argument('--device', '-device', type = str, default = 'cpu', help = 'cuda/cpu')
+    parser.add_argument('--design', '-design', type = int, default = 0, help = 'design number')
+    parser.add_argument('--pl', '-pl', type = int, default = 0, help = 'use placement info or not')
     args = parser.parse_args()
     return args
 
@@ -91,7 +93,7 @@ np.random.seed(args.seed)
 device = args.device
 print(device)
 
-if args.gnn_type == "hyper" or args.gnn_type == 'hypernodir':
+if args.gnn_type not in ["gcn", "gat"]:
     sparse = True
 else:
     sparse = False
@@ -138,13 +140,13 @@ if args.load_pd == 1:
     load_pd = True
 
 if pe == 'lap':
-    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, concat = concat)
-    valid_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'valid', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, concat = concat)
-    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, concat = concat)
+    train_dataset = pyg_dataset(design = args.design, pl = args.pl, data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, concat = concat, net = False)
+    valid_dataset = pyg_dataset(design = args.design, pl = args.pl, data_dir = args.data_dir, fold_index = args.fold, split = 'valid', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, concat = concat, net = False)
+    test_dataset = pyg_dataset(design = args.design, pl = args.pl, data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, concat = concat, net = False)
 else:
-    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_global_info = load_global_info, load_pd = load_pd, load_pe = False, vn=args.virtual_node, concat = concat)
-    valid_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'valid', target = args.target, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, concat = concat)
-    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_global_info = load_global_info, load_pd = load_pd, load_pe = False, vn=args.virtual_node, concat = concat)
+    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, design = args.design, pl = args.pl, split = 'train', target = args.target, load_global_info = load_global_info, load_pd = load_pd, load_pe = False, vn=args.virtual_node, concat = concat)
+    valid_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, design = args.design, pl = args.pl, split = 'valid', target = args.target, load_global_info = load_global_info, load_pd = load_pd, load_pe = False, vn = args.virtual_node, concat = concat)
+    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, design = args.design, pl = args.pl, split = 'test', target = args.target, load_global_info = load_global_info, load_pd = load_pd, load_pe = False, vn=args.virtual_node, concat = concat)
     
 
 # Data loaders
@@ -249,7 +251,11 @@ else:
 
 # Train model
 best_mae = 1e9
+patience = 100
+stop = False
 for epoch in range(num_epoch):
+    if stop:
+        break
     print('--------------------------------------')
     print('Epoch', epoch)
     LOG.write('--------------------------------------\n')
@@ -326,7 +332,7 @@ for epoch in range(num_epoch):
     model.eval()
     total_loss = 0.0
     nBatch = 0
-
+ 
     with torch.no_grad():
         sum_error = 0.0
         num_samples = 0
@@ -382,6 +388,7 @@ for epoch in range(num_epoch):
     
     if valid_mae < best_mae:
         best_mae = valid_mae
+        patience = 100
         print('Current best MAE updated:', best_mae)
         LOG.write('Current best MAE updated: ' + str(best_mae) + '\n')
         print('Current best MAE (original scale) updated:', best_mae * y_std)
@@ -391,9 +398,10 @@ for epoch in range(num_epoch):
         print("Save the best model to " + model_name)
         LOG.write("Save the best model to " + model_name + "\n")
     else:
-        # Early stopping
-        # break
-        pass
+        patience -= 1
+        print(f'Patience: {patience}')
+        if patience <= 0:
+            stop = True
 
 if args.test_mode == 0:
     print('--------------------------------------')

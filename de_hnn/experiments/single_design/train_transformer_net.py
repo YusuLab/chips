@@ -55,6 +55,7 @@ def _parse_args():
     parser.add_argument('--test_mode', '-test_mode', type = int, default = 0, help = 'Test mode')
     parser.add_argument('--device', '-device', type = str, default = 'cpu', help = 'cuda/cpu')
     parser.add_argument('--graph_index', '-graph_index', type = int, default = 0, help = 'Index of the graph')
+    parser.add_argument('--split', '-split', type = int, default = 1, help = 'Index of the split')
     args = parser.parse_args()
     return args
 
@@ -97,9 +98,9 @@ pe_type = args.pe_type
 pe_dim = args.pe_dim
 
 if pe_type == 'lap':
-    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_pe = True, num_eigen = pe_dim, load_global_info = load_global_info, load_pd = load_pd, concat=True)
+    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_pe = True, num_eigen = pe_dim, load_global_info = load_global_info, load_pd = load_pd, concat=True, split=args.split)
 else:
-    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_global_info = load_global_info, load_pd = load_pd, concat=True)
+    dataset = pyg_dataset(data_dir = args.data_dir, graph_index = args.graph_index, target = args.target, load_global_info = load_global_info, load_pd = load_pd, concat=True, split=args.split)
 
 # Data loaders
 batch_size = args.batch_size

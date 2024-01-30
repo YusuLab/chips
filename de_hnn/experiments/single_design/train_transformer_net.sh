@@ -17,12 +17,12 @@ dir=./$program/$target/
 
 data_dir=../../data/2023-03-06_data/
 
-num_epoch=1000
+num_epoch=1
 batch_size=1
 learning_rate=0.001
 seed=123456789
 hidden_dim=64
-heads=1
+heads=4
 local_heads=1
 depth=2
 

@@ -2,8 +2,8 @@
 
 program=train_transformer_net
 
-#target=hpwl
-target=demand
+target=hpwl
+#target=demand
 #target=capacity
 #target=congestion
 
@@ -15,14 +15,14 @@ dir=./$program/$target/
 
 data_dir=../../data/2023-03-06_data/
 
-num_epoch=1000
+num_epoch=1
 batch_size=1
 learning_rate=0.001
 seed=123456789
 hidden_dim=64
 heads=4
 local_heads=1
-depth=3
+depth=2
 
 # Global information
 load_global_info=1
@@ -35,7 +35,7 @@ device=cuda
 device_idx=1
 
 # Test mode
-test_mode=1
+test_mode=0
 
 # Position encoding dimension if used
 pe_dim=10

@@ -9,7 +9,7 @@ import pickle
 from tqdm import tqdm
 
 class pyg_dataset(Dataset):
-    def __init__(self, data_dir, graph_index, target, load_pe = False, num_eigen = 10, load_global_info = True, load_pd = False, vn = False, concat = False):
+    def __init__(self, data_dir, graph_index, target, load_pe = False, num_eigen = 10, load_global_info = True, load_pd = False, vn = False, concat = False, split = 1, pl = 0):
         super().__init__()
         self.data_dir = data_dir
         self.graph_index = graph_index
@@ -22,7 +22,9 @@ class pyg_dataset(Dataset):
         self.load_global_info = load_global_info
         self.load_pd = load_pd
         
-        split_data_dir = "../../data/split/"
+        print(f"Placement Information {pl}")
+        split_data_dir = data_dir + f"/split/{split}/"
+        print(split_data_dir)
         file_name = split_data_dir + str(graph_index) + '.split.pkl'
         f = open(file_name, 'rb')
         dictionary = pickle.load(f)
@@ -89,9 +91,11 @@ class pyg_dataset(Dataset):
         example.x = x
 
         # Load capacity
-        #capacity = capacity.unsqueeze(dim = 1)
-        #norm_cap = (capacity - torch.min(capacity)) / (torch.max(capacity) - torch.min(capacity))
-        #capacity_features = torch.cat([capacity, torch.sqrt(capacity), norm_cap, torch.sqrt(norm_cap), torch.square(norm_cap), torch.sin(norm_cap), torch.cos(norm_cap)], dim = 1)
+        if pl:
+            capacity = capacity.unsqueeze(dim = 1)
+            norm_cap = (capacity - torch.min(capacity)) / (torch.max(capacity) - torch.min(capacity))
+            capacity_features = torch.cat([capacity, torch.sqrt(capacity), norm_cap, torch.sqrt(norm_cap), torch.square(norm_cap), torch.sin(norm_cap), torch.cos(norm_cap)], dim = 1)
+            example.x = torch.cat([example.x, capacity_features], dim = 1)
 
         
         #example.x = torch.cat([example.x, capacity_features], dim = 1)
@@ -120,11 +124,16 @@ class pyg_dataset(Dataset):
     
         example.cell_degrees = d['cell_degrees']
         example.net_degrees = d['net_degrees']
+        
+        example.x_net = torch.Tensor(example.net_degrees).unsqueeze(dim = 1)
           
         self.example = example
       
         if vn:
-            file_name = data_dir + '/' + str(graph_index) + '.star_part_dict.pkl'
+            if pl:       
+                file_name = data_dir + '/' + str(first_index) + '.metis_part_dict.pkl'
+            else:
+                file_name = data_dir + '/' + str(graph_index) + '.star_part_dict.pkl'
             f = open(file_name, 'rb')
             part_dict = pickle.load(f)
             f.close()
@@ -135,11 +144,16 @@ class pyg_dataset(Dataset):
                 part_id_lst.append(part_dict[idx])
 
             part_id = torch.LongTensor(part_id_lst)
-
-            example.part_id = part_id
-
+            
             example.num_vn = len(torch.unique(part_id))
 
+            top_part_id = torch.Tensor([0 for idx in range(example.num_vn)]).long()
+
+            example.num_top_vn = len(torch.unique(top_part_id))
+
+            example.part_id = part_id
+            example.top_part_id = top_part_id
+            
         
         # Load positional encoding
         if self.load_pe == True:
@@ -167,9 +181,15 @@ class pyg_dataset(Dataset):
             example.x_net = torch.Tensor(example.net_degrees).unsqueeze(dim = 1)
 
 
+        if pl:
+            first_index = graph_index
+            nerighbor_f = 'node_neighbors_pl/'
+        else:
+            nerighbor_f = 'node_neighbors/'
+
         # Load persistence diagram and neighbor list
         if self.load_pd == True:
-            file_name = data_dir + '/' + str(first_index) + '.node_neighbor_features.pkl'
+            file_name = data_dir + '/' + nerighbor_f + str(first_index) + '.node_neighbor_features.pkl'
             f = open(file_name, 'rb')
             dictionary = pickle.load(f)
             f.close()
@@ -182,18 +202,21 @@ class pyg_dataset(Dataset):
 
             example.x = torch.cat([example.x, pd, neighbor_list], dim = 1)
         else:
-            file_name = data_dir + '/' + str(first_index) + '.node_neighbor_features.pkl'
+            file_name = data_dir + '/' + nerighbor_f + str(first_index) + '.node_neighbor_features.pkl'
             f = open(file_name, 'rb')
             dictionary = pickle.load(f)
             f.close()
 
-            pd = torch.Tensor(dictionary['pd'])
             neighbor_list = torch.Tensor(dictionary['neighbor'])
 
-            assert pd.size(0) == num_instances
-            assert neighbor_list.size(0) == num_instances
+            num_neighbor = int(neighbor_list.shape[1]/2)
 
-            example.x = torch.cat([example.x, neighbor_list], dim = 1)
+            neighbor_list = neighbor_list[:, :num_neighbor] + neighbor_list[:, num_neighbor:]
+
+            assert neighbor_list.size(0) == num_instances
+            assert neighbor_list.size(1) == 6
+
+            example.x = torch.cat([example.x, neighbor_list], dim = 1)    
             
         if concat:     
             node_feat = example.x

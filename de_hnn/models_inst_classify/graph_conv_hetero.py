@@ -7,6 +7,12 @@ from torch_geometric.utils import degree
 from torch_geometric.nn.conv import GATv2Conv
 from torch_geometric.nn.conv.pna_conv import PNAConv
 from torch.nn import Sequential as Seq, Linear, ReLU
+from hmpnn_layer import HMPNNLayer
+from hnhn_layer import HNHNLayer
+from hypersage_layer import HyperSAGELayer
+from allset_layer import AllSetLayer
+#from allset_transformer_layer import AllSetTransformerLayer
+
 
 import math
 
@@ -86,20 +92,16 @@ class HyperConvNoDir(MessagePassing):
         self.phi = Seq(Linear(out_channels, out_channels),
                        ReLU(),
                        Linear(out_channels, out_channels))
-        
-        self.psi = Seq(Linear(out_channels, out_channels),
-                       ReLU(),
-                       Linear(out_channels, out_channels))
 
-        self.mlp = Seq(Linear(out_channels * 2, out_channels * 3),
+        self.mlp = Seq(Linear(out_channels * 2, out_channels * 2),
                        ReLU(),
-                       Linear(out_channels * 3, out_channels))
+                       Linear(out_channels * 2, out_channels))
 
-    def forward(self, x, net_inst_adj, inst_net_adj_v_drive, inst_net_adj_v_sink):
+    def forward(self, x, x_net, net_inst_adj, inst_net_adj_v_drive, inst_net_adj_v_sink):
         
         h = self.phi(x)
         
-        net_agg = torch.mm(net_inst_adj, h)
+        net_agg = torch.mm(net_inst_adj, h) + x_net
         
         h_drive = torch.mm(inst_net_adj_v_drive, net_agg)
         
@@ -107,9 +109,9 @@ class HyperConvNoDir(MessagePassing):
         
         h_update = h_drive + h_sink
         
-        h_update = self.psi(h_update)
+        h = self.mlp(torch.concat([x, h_update], dim=1)) + x
         
-        return self.mlp(torch.concat([x, h_update], dim=1)) + x   
+        return h, net_agg   
 
 ### GNN to generate node embedding
 class GNN_node(torch.nn.Module):
@@ -128,7 +130,7 @@ class GNN_node(torch.nn.Module):
                         cfg_posenc = None, # For SignNet position encoding
 
                         num_nodes = None, # Number of nodes
-
+                        incidence = None,
                         device = 'cuda'
                     ):
         '''
@@ -166,6 +168,7 @@ class GNN_node(torch.nn.Module):
                 
         ###List of GNNs
         self.convs = torch.nn.ModuleList()
+        self.re_convs = torch.nn.ModuleList()
         #self.batch_norms = torch.nn.ModuleList()
         self.norms = torch.nn.ModuleList()
         #self.mlps = torch.nn.ModuleList()
@@ -174,14 +177,30 @@ class GNN_node(torch.nn.Module):
         for layer in range(num_layer):
             if gnn_type == 'gat':
                 self.convs.append(GATv2Conv(in_channels = emb_dim, out_channels = emb_dim, heads = 1))
+                self.re_convs.append(GATv2Conv(in_channels = emb_dim, out_channels = emb_dim, heads = 1))
             elif gnn_type == 'gcn':
                 self.convs.append(GCNConv(emb_dim, edge_dim))
+                self.re_convs.append(GCNConv(emb_dim, edge_dim))
             elif gnn_type == 'pna':
                 self.convs.append(PNAConv(in_channels = emb_dim, out_channels = emb_dim, aggregators = aggregators, scalers = scalers, deg = deg, edge_dim = edge_dim))
             elif gnn_type == 'hyper':
                 self.convs.append(HyperConv(emb_dim, edge_dim))
             elif gnn_type == 'hypernodir':
                 self.convs.append(HyperConvNoDir(emb_dim, edge_dim))
+            elif gnn_type == 'hmpnn':
+                self.convs.append(HMPNNLayer(
+                    emb_dim,
+                    adjacency_dropout=0.7,
+                    updating_dropout=0.5,
+                ))
+            elif gnn_type == "hnhn":
+                self.convs.append(HNHNLayer(
+                    in_channels=emb_dim,
+                    hidden_channels=emb_dim,
+                    incidence_1=incidence,
+                ))
+            elif gnn_type == "allset":
+                self.convs.append(AllSetLayer(in_channels=emb_dim, hidden_channels=emb_dim))
             else:
                 raise ValueError('Undefined GNN type called {}'.format(gnn_type))
                     
@@ -192,25 +211,10 @@ class GNN_node(torch.nn.Module):
                 self.norms.append(torch.nn.LayerNorm(emb_dim))
             else:
                 raise NotImplemented
-
-        if gnn_type != 'hyper' and gnn_type != 'hypernodir':
-            # Reverse, from target to source
-            self.re_convs = torch.nn.ModuleList()
-
-            for layer in range(num_layer):
-                if gnn_type == 'gat':
-                    self.re_convs.append(GATv2Conv(in_channels = emb_dim, out_channels = emb_dim, heads = 1))
-                elif gnn_type == 'gcn':
-                    self.re_convs.append(GCNConv(emb_dim, edge_dim))
-                elif gnn_type == 'pna':
-                    self.re_convs.append(PNAConv(in_channels = emb_dim, out_channels = emb_dim, aggregators = aggregators, scalers = scalers, deg = deg, edge_dim = edge_dim))
-                else:
-                    raise ValueError('Undefined GNN type called {}'.format(gnn_type))
-#                    
-
+                
     def forward(self, batched_data):
 
-        if self.gnn_type == 'hyper' or self.gnn_type == 'hypernodir':
+        if self.gnn_type not in ["gcn", "gat"]: 
             x, net_inst_adj, inst_net_adj_v_drive, inst_net_adj_v_sink, batch = batched_data.x, batched_data.net_inst_adj, batched_data.inst_net_adj_v_drive, batched_data.inst_net_adj_v_sink, batched_data.batch
         
         else:
@@ -228,11 +232,21 @@ class GNN_node(torch.nn.Module):
             batched_data.eigvecs_sn = batched_data.eigvecs_sn.to(device = self.device)
 
             h_list = [self.node_encoder(batched_data).x]
+        
 
         for layer in range(self.num_layer):
-            if self.gnn_type == 'hyper' or self.gnn_type == 'hypernodir':
+            if self.gnn_type not in ['gcn', 'gat']:
                 h_inst, h_net = h_list[layer][:num_instances], h_list[layer][num_instances:]
-                h_inst, h_net = self.convs[layer](h_inst, h_net, net_inst_adj, inst_net_adj_v_drive, inst_net_adj_v_sink)
+                
+                if self.gnn_type == 'hmpnn':
+                    h_inst, h_net = self.convs[layer](h_inst, h_net, net_inst_adj.T)
+                elif self.gnn_type == 'hnhn':
+                    h_inst, h_net = self.convs[layer](h_inst, incidence_1=net_inst_adj)
+                elif self.gnn_type == 'allset':
+                    h_inst, h_net = self.convs[layer](h_inst, net_inst_adj.T)
+                else:
+                    h_inst, h_net = self.convs[layer](h_inst, h_net, net_inst_adj, inst_net_adj_v_drive, inst_net_adj_v_sink)
+                
                 h = torch.cat([h_inst, h_net], dim=0)
 
             else:

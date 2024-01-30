@@ -33,27 +33,24 @@ print('Graph index:', graph_index)
 print(X.shape)
 
 num_samples = X.shape[0]
-perm = np.random.permutation(num_samples)
+perm = np.arange(num_samples)
 
-train_percent = 60
-valid_percent = 20
-test_percent = 20
+from sklearn.model_selection import KFold
 
-num_train = num_samples * train_percent // 100
-num_valid = num_samples * valid_percent // 100
-num_test = num_samples - num_train - num_valid
+kf = KFold(n_splits=4, random_state=123456789, shuffle=True)
+idx_num = 1
 
-train_indices = perm[:num_train]
-valid_indices = perm[num_train:num_train+num_valid]
-test_indices = perm[num_train+num_valid:]
+for train_indices, valid_indices in kf.split(perm):
+    print(train_indices.shape, valid_indices.shape)
+    #print(num_train, num_valid)
 
-assert train_indices.shape[0] == num_train
-assert valid_indices.shape[0] == num_valid
-assert test_indices.shape[0] == num_test
+    #assert train_indices.shape[0] == num_train - 1
+    #assert valid_indices.shape[0] == num_valid + 1
+    #assert test_indices.shape[0] == num_test
 
-print('Number of training samples:', num_train)
-print('Number of validation samples:', num_valid)
-print('Number of testing samples:', num_test)
+    #print('Number of training samples:', num_train)
+    #print('Number of validation samples:', num_valid)
+    #print('Number of testing samples:', num_test)
 
 #file_name = data_dir + '/' + str(graph_index) + '.bipartite.pkl'
 #f = open(file_name, 'rb')
@@ -75,13 +72,15 @@ print('Number of testing samples:', num_test)
 #valid_indices_inst = np.unique(valid_indices_inst)
 #test_indices_inst = np.unique(test_indices_inst)
 
-dictionary = {
-    'train_indices': train_indices,
-    'valid_indices': valid_indices,
-    'test_indices': test_indices
-}
-f = open(str(graph_index) + '.split_net.pkl', 'wb')
-pickle.dump(dictionary, f)
-f.close()
+    dictionary = {
+        'train_indices': train_indices,
+        'valid_indices': valid_indices,
+        'test_indices': valid_indices
+    }
+    f = open('split' + '/' + str(idx_num) + '/' + str(graph_index) + '.split_net.pkl', 'wb')
+    pickle.dump(dictionary, f)
+    f.close()
+    
+    idx_num += 1
 
 print('Done')

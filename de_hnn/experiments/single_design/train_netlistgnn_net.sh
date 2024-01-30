@@ -47,7 +47,7 @@ load_pd=1
 test_mode=0
 
 # Execution
-name=${program}.${target}.n_layer.${n_layer}.node_feats.${node_feats}.net_feats.${net_feats}.pin_feats.${pin_feats}.edge_feats.${edge_feats}.num_epoch.${num_epoch}.batch_size.${batch_size}.learning_rate.${learning_rate}.seed.${seed}.pe.${pe}.pos_dim.${pos_dim}.load_global_info.${load_global_info}.load_pd.${load_pd}.graph_index.${graph_index}
-CUDA_VISIBLE_DEVICES=$device_idx python3 $program.py --target=$target --n_layer=$n_layer --node_feats=$node_feats --net_feats=$net_feats --pin_feats=$pin_feats --edge_feats=$edge_feats --dir=$dir --name=$name --num_epoch=$num_epoch --batch_size=$batch_size --learning_rate=$learning_rate --seed=$seed --pe=$pe --pos_dim=$pos_dim --load_global_info=$load_global_info --load_pd=$load_pd --test_mode=$test_mode --device=$device --data_dir=$data_dir --graph_index=$graph_index
+name=${program}.${target}.n_layer.${n_layer}.node_feats.${node_feats}.net_feats.${net_feats}.pin_feats.${pin_feats}.edge_feats.${edge_feats}.num_epoch.${num_epoch}.batch_size.${batch_size}.learning_rate.${learning_rate}.seed.${seed}.pe.${pe}.pos_dim.${pos_dim}.load_global_info.${load_global_info}.load_pd.${load_pd}.split.${split}..graph_index.${graph_index}
+CUDA_VISIBLE_DEVICES=$device_idx python3 $program.py --target=$target --n_layer=$n_layer --node_feats=$node_feats --net_feats=$net_feats --pin_feats=$pin_feats --edge_feats=$edge_feats --dir=$dir --name=$name --num_epoch=$num_epoch --batch_size=$batch_size --learning_rate=$learning_rate --seed=$seed --pe=$pe --pos_dim=$pos_dim --load_global_info=$load_global_info --load_pd=$load_pd --test_mode=$test_mode --device=$device --data_dir=$data_dir --graph_index=$graph_index --split=$split
 
 

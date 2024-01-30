@@ -58,6 +58,8 @@ def _parse_args():
     parser.add_argument('--load_pd', '-load_pd', type = int, default = 0, help = 'Persistence diagram & Neighbor list')
     parser.add_argument('--fold', '-fold', type = int, default = 0, help = 'Fold index in cross-validation')
     parser.add_argument('--device', '-device', type = str, default = 'cpu', help = 'cuda/cpu')
+    parser.add_argument('--design', '-design', type = int, default = 0, help = 'design number')
+    parser.add_argument('--pl', '-pl', type = int, default = 0, help = 'use placement info or not')
     args = parser.parse_args()
     return args
 
@@ -82,15 +84,15 @@ np.random.seed(args.seed)
 # Train on CPU (hide GPU) due to memory constraints
 # os.environ['CUDA_VISIBLE_DEVICES'] = ""
 device = args.device
-print(device)
+print("device", device)
 gnn_type = args.gnn_type
-if args.gnn_type == "hyper" or args.gnn_type == 'hypernodir' or args.gnn_type == 'sota':
+if args.gnn_type not in ["gcn", 'gat']:
     sparse = True
 else:
     sparse = False
 
 if sparse:
-    from pyg_dataset_sparse import pyg_dataset
+    from pyg_dataset_sparse_net import pyg_dataset
 # Dataset
 print('Create data loaders')
 pe = args.pe
@@ -108,7 +110,7 @@ if pe == 'signnet':
     config.posenc_SignNet.dim_pe = pos_dim
 
 # Dataset
-print(args.data_dir)
+print("data_dir", args.data_dir)
 
 load_global_info = False
 if args.load_global_info == 1:
@@ -132,9 +134,9 @@ else:
 print("single", single)
     
 if pe == 'lap':
-    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, net=True)
-    valid_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'valid', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, net=True)
-    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, net=True)
+    train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, net=True, design = args.design, pl = args.pl)
+    valid_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'valid', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, net=True, design = args.design, pl = args.pl)
+    test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node, net=True, design = args.design, pl = args.pl)
 else:
     if sparse:
         train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_global_info = load_global_info, load_pd = load_pd, load_pe = False, vn=args.virtual_node, net=True)
@@ -142,7 +144,7 @@ else:
         test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_global_info = load_global_info, load_pd = load_pd, load_pe = False, vn=args.virtual_node, net=True)
     else:
         train_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'train', target = args.target, load_global_info = load_global_info, load_pd = load_pd, load_pe = False, vn=args.virtual_node)
-        valid_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'valid', target = args.target, load_pe = True, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node)
+        valid_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'valid', target = args.target, load_pe = False, num_eigen = pos_dim, load_global_info = load_global_info, load_pd = load_pd, vn = virtual_node)
         test_dataset = pyg_dataset(data_dir = args.data_dir, fold_index = args.fold, split = 'test', target = args.target, load_global_info = load_global_info, load_pd = load_pd, load_pe = False, vn=args.virtual_node)
 # Data loaders
 batch_size = args.batch_size
@@ -183,8 +185,8 @@ if pe == 'lap':
     node_dim += pos_dim
     net_dim += pos_dim
 
-    print('Number of eigenvectors:', pos_dim)
-    print('Number of node features + position encoding:', node_dim)
+print('Number of eigenvectors:', pos_dim)
+print('Number of node features + position encoding:', node_dim)
 
 # Statistics
 y = []
@@ -246,7 +248,11 @@ else:
 # Login to Wandb
 # Train model
 best_mae = 1e9
+patience = 250
+stop = False
 for epoch in range(num_epoch):
+    if stop:
+        break
     print('--------------------------------------')
     print('Epoch', epoch)
     LOG.write('--------------------------------------\n')
@@ -258,22 +264,23 @@ for epoch in range(num_epoch):
     nBatch = 0
     sum_error = 0.0
     num_samples = 0
-    
     for batch_idx, data in enumerate(train_dataloader):
         #print(batch_idx, data)
-        
+        if stop:
+            break
+
         data = data.to(device = device)
         target = (data.y - y_mean) / y_std
-
+        
         if pe == 'lap':
             data.x = torch.cat([data.x, data.evects[:data.x.shape[0]]], dim = 1)
             data.x_net = torch.cat([data.x_net, data.evects[data.x.shape[0]:]], dim = 1)
 
-        if use_signnet == True:
-            data.x = data.x.type(torch.FloatTensor).to(device = device)
+        #if use_signnet == True:
+        #    data.x = data.x.type(torch.FloatTensor).to(device = device)
 
-        if gnn_type == 'pna':
-            data.edge_attr = data.edge_attr.type(torch.FloatTensor).to(device = device)
+        #if gnn_type == 'pna':
+        #    data.edge_attr = data.edge_attr.type(torch.FloatTensor).to(device = device)
 
         predict = model(data)
         predict = predict[: target.size(0), :]
@@ -295,9 +302,6 @@ for epoch in range(num_epoch):
         if batch_idx % 10 == 0:
             print('Batch', batch_idx, '/', len(train_dataloader),': Loss =', loss.item())
             LOG.write('Batch ' + str(batch_idx) + '/' + str(len(train_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
-    
-        del loss
-        del predict
 
     train_mae = sum_error / (num_samples * num_outputs)
     avg_loss = total_loss / nBatch
@@ -350,9 +354,6 @@ for epoch in range(num_epoch):
             if batch_idx % 10 == 0:
                 print('Valid Batch', batch_idx, '/', len(valid_dataloader),': Loss =', loss.item())
                 LOG.write('Valid Batch ' + str(batch_idx) + '/' + str(len(valid_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
-        
-            del loss
-            del predict
 
     valid_mae = sum_error / (num_samples * num_outputs)
     avg_loss = total_loss / nBatch
@@ -369,6 +370,7 @@ for epoch in range(num_epoch):
 
     if valid_mae < best_mae:
         best_mae = valid_mae
+        patience = 250
         print('Current best MAE updated:', best_mae)
         LOG.write('Current best MAE updated: ' + str(best_mae) + '\n')
         print('Current best MAE (original scale) updated:', best_mae * y_std)
@@ -377,11 +379,71 @@ for epoch in range(num_epoch):
         torch.save(model.state_dict(), model_name)
         print("Save the best model to " + model_name)
         LOG.write("Save the best model to " + model_name + "\n")
+    
     else:
         # Early stopping
         # break
-        pass
-
+        patience -= 1
+        print(f'Patience: {patience}')
+        if patience <= 0:
+            stop = True
+            
+    # Testing
+    t = time.time()
+    total_loss = 0.0
+    nBatch = 0
+    
+    y_test = []
+    y_hat = []
+    
+    with torch.no_grad():
+        sum_error = 0.0
+        num_samples = 0
+        for batch_idx, data in enumerate(test_dataloader):
+            data = data.to(device = device)
+            target = (data.y - y_mean) / y_std
+    
+            if pe == 'lap':
+                data.x = torch.cat([data.x, data.evects[:data.x.shape[0]]], dim = 1)
+                data.x_net = torch.cat([data.x_net, data.evects[data.x.shape[0]:]], dim = 1)
+    
+            if use_signnet == True:
+                data.x = data.x.type(torch.FloatTensor).to(device = device)
+    
+            if gnn_type == 'pna':
+                data.edge_attr = data.edge_attr.type(torch.FloatTensor).to(device = device)
+    
+            predict = model(data)
+            predict = predict[: target.size(0), :]
+            
+            # Mean squared error loss
+            loss = F.mse_loss(predict.view(-1), target.view(-1), reduction = 'mean')
+    
+            y_test.append(target.view(-1))
+            y_hat.append(predict.view(-1))
+    
+            total_loss += loss.item()
+            nBatch += 1
+    
+            sum_error += torch.sum(torch.abs(predict.view(-1) - target.view(-1))).detach().cpu().numpy()
+            num_samples += predict.size(0)
+    
+            if batch_idx % 10 == 0:
+                print('Test Batch', batch_idx, '/', len(test_dataloader),': Loss =', loss.item())
+                LOG.write('Test Batch ' + str(batch_idx) + '/' + str(len(test_dataloader)) + ': Loss = ' + str(loss.item()) + '\n')
+    
+    test_mae = sum_error / (num_samples * num_outputs)
+    avg_loss = total_loss / nBatch
+    
+    print('--------------------------------------')
+    LOG.write('--------------------------------------\n')
+    print('Test average loss:', avg_loss)
+    LOG.write('Test average loss: ' + str(avg_loss) + '\n')
+    print('Test MAE:', test_mae)
+    LOG.write('Test MAE: ' + str(test_mae) + '\n')
+    print('Test MAE (original scale):', test_mae * y_std)
+    LOG.write('Test MAE (original scale): ' + str(test_mae * y_std) + '\n')
+    
 if args.test_mode == 0:
     print('--------------------------------------')
     LOG.write('--------------------------------------\n')
