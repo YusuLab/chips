@@ -4,7 +4,7 @@ This is the github repository for the codes for paper: "DE-HNN: An effective neu
 
 ## How to Download Netlist Data
 
-Raw data is available at [url]. 
+Raw data is available at [https://zenodo.org/records/10795280?token=eyJhbGciOiJIUzUxMiJ9.eyJpZCI6Ijk5NjM2MzZiLTg0ZmUtNDI2My04OTQ3LTljMjA5ZjA3N2Y1OSIsImRhdGEiOnt9LCJyYW5kb20iOiJlYzFmMGJlZTU3MzE1OWMzOTU2MWZkYTE3MzY5ZjRjOCJ9.WifQFExjW1CAW0ahf3e5Qr0OV9c2cw9_RUbOXUsvRbnKlkApNZwVCL_VPRJvAve0MJDC0DDOSx_RLiTvBimr0w]. 
 
 After downloading the raw data, please extract and put the raw data directory to "/de_hnn/data/" directory.
 
@@ -15,7 +15,7 @@ source run_all_python_scripts.sh
 ```
 ### Skip Processing Data
 
-If one does not want to process the raw data for any reason but just need the processed data, the full processed data is also available at [url].
+If one does not want to process the raw data for any reason but just need the processed data, the full processed data is also available at [https://zenodo.org/records/10795280?token=eyJhbGciOiJIUzUxMiJ9.eyJpZCI6Ijk5NjM2MzZiLTg0ZmUtNDI2My04OTQ3LTljMjA5ZjA3N2Y1OSIsImRhdGEiOnt9LCJyYW5kb20iOiJlYzFmMGJlZTU3MzE1OWMzOTU2MWZkYTE3MzY5ZjRjOCJ9.WifQFExjW1CAW0ahf3e5Qr0OV9c2cw9_RUbOXUsvRbnKlkApNZwVCL_VPRJvAve0MJDC0DDOSx_RLiTvBimr0w].
 
 After downloading the processed data, please extract and put the data directory to "/de_hnn/data/" directory.
 
