@@ -63,6 +63,7 @@ class pyg_dataset(Dataset):
             num_nets = dictionary['num_nets']
             instance_features = torch.Tensor(dictionary['instance_features'])
             
+            print(instance_features.shape)
             if pl:
                 instance_features = instance_features
                 #pos_lst = dictionary['instance_features'][:, :2]
@@ -71,8 +72,10 @@ class pyg_dataset(Dataset):
                 #yloc_list = Y*(dictionary['y_max'] - dictionary['y_min']) + dictionary['y_min']
                 #instance_features = torch.cat([instance_features[:, 2:], torch.Tensor(xloc_list).unsqueeze(dim = 1), torch.Tensor(yloc_list).unsqueeze(dim = 1)], dim=1) 
             else:
-                instance_features = instance_features[:, :2]
+                instance_features = instance_features[:, 2:]
 
+            print(instance_features.shape)
+            
             file_name = data_dir + '/' + str(sample) + '.net_demand_capacity.pkl'
             f = open(file_name, 'rb')
             dictionary = pickle.load(f)
@@ -132,7 +135,7 @@ class pyg_dataset(Dataset):
             example = Data()
             example.__num_nodes__ = x.size(0)
             example.x = x
-            
+            print(x.shape) 
 #             # Load capacity
             capacity = capacity.unsqueeze(dim = 1)
             norm_cap = (capacity - torch.min(capacity)) / (torch.max(capacity) - torch.min(capacity))
@@ -210,13 +213,13 @@ class pyg_dataset(Dataset):
                 example.x = torch.cat([example.x, global_info], dim = 1)
             
             if pl:
-                nerighbor_f = 'node_neighbors_pl/'
+                nerighbor_f = 'node_neighbors/'
             else:
                 nerighbor_f = 'node_neighbors/'
             
             # Load persistence diagram and neighbor list
             if self.load_pd == True:
-                file_name = data_dir + '/' + nerighbor_f + str(graph_index) + '.node_neighbor_features.pkl'
+                file_name = data_dir + '/' + nerighbor_f + str(first_index) + '.node_neighbor_features.pkl'
                 
                 print("read file:", file_name)
                 
@@ -232,7 +235,7 @@ class pyg_dataset(Dataset):
 
                 example.x = torch.cat([example.x, pd, neighbor_list], dim = 1)
             else:
-                file_name = data_dir + '/' + nerighbor_f + str(graph_index) + '.node_neighbor_features.pkl'
+                file_name = data_dir + '/' + nerighbor_f + str(first_index) + '.node_neighbor_features.pkl'
                 f = open(file_name, 'rb')
                 dictionary = pickle.load(f)
                 f.close()

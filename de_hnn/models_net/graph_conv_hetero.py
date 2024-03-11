@@ -194,8 +194,7 @@ class GNN_node(torch.nn.Module):
             elif gnn_type == "hnhn":
                 self.convs.append(HNHNLayer(
                     in_channels=emb_dim,
-                    hidden_channels=emb_dim,
-                    incidence_1=incidence,
+                    hidden_channels=emb_dim
                 ))
             elif gnn_type == "allset":
                 self.convs.append(AllSetLayer(in_channels=emb_dim, hidden_channels=emb_dim))
@@ -237,7 +236,7 @@ class GNN_node(torch.nn.Module):
             h_list = [self.node_encoder(batched_data).x]
 
         for layer in range(self.num_layer):
-            if self.gnn_type not in ['gcn', 'gat']:
+            if self.gnn_type not in ['gcn', 'gat', 'sota']:
                 if self.gnn_type == 'hmpnn':
                     h_inst, h_net = self.convs[layer](h_list[layer][:num_instances], h_list[layer][num_instances:], net_inst_adj.T)
                 elif self.gnn_type == 'hnhn':
@@ -257,14 +256,20 @@ class GNN_node(torch.nn.Module):
                 h = F.leaky_relu(h, negative_slope = 0.1)
                                   
             elif self.gnn_type == 'sota':
-                h_inst = self.convs[layer](x=h_list[layer], hyperedge_index=net_inst_adj.T._indices(), hyperedge_attr=h_net_list[layer], num_edges=x_net.size(0)) 
+                h_inst = self.convs[layer](x=h_list[layer][:num_instances], hyperedge_index=net_inst_adj.T._indices(), hyperedge_attr=h_list[layer][num_instances:], num_edges=x_net.size(0)) 
                 h_net = torch.mm(net_inst_adj, h_inst) 
-                h_inst += h_list[layer]
-                h_net += h_net_list[layer]
-                h_inst = self.norms[layer](h_inst)
-                h_inst = F.leaky_relu(h_inst, negative_slope = 0.1)
-                h_net = self.norms[layer](h_net)
-                h_net = F.leaky_relu(h_net, negative_slope = 0.1)
+                
+                h = torch.cat([h_inst, h_net], dim=0)
+                h += h_list[layer]
+                h = self.norms[layer](h)
+                h = F.leaky_relu(h, negative_slope = 0.1)
+                
+                #h_inst += h_list[layer]
+                #h_net += h_net_list[layer]
+                #h_inst = self.norms[layer](h_inst)
+                #h_inst = F.leaky_relu(h_inst, negative_slope = 0.1)
+                #h_net = self.norms[layer](h_net)
+                #h_net = F.leaky_relu(h_net, negative_slope = 0.1)
                 
             else:
                 h = self.convs[layer](h_list[layer], edge_index)
@@ -277,10 +282,6 @@ class GNN_node(torch.nn.Module):
                 #h_list.append(h[:num_instances])
                 #h_net_list.append(h[num_instances:])    
                 h_list.append(h)
-
-            elif self.gnn_type == 'sota':
-                h_list.append(h_inst)
-                h_net_list.append(h_net)
 
             else:
                 h_list.append(h)
@@ -438,9 +439,9 @@ class GNN_node_Virtualnode(torch.nn.Module):
         for layer in range(num_layer - 1):
             self.mlp_virtualnode_list.append(
                     torch.nn.Sequential(
-                        torch.nn.Linear(emb_dim, emb_dim*2), 
+                        torch.nn.Linear(emb_dim, emb_dim), 
                         torch.nn.LeakyReLU(negative_slope = 0.1),
-                        torch.nn.Linear(emb_dim*2, emb_dim), 
+                        torch.nn.Linear(emb_dim, emb_dim), 
                         torch.nn.LeakyReLU(negative_slope = 0.1)
                     )
             )
@@ -450,6 +451,8 @@ class GNN_node_Virtualnode(torch.nn.Module):
                         torch.nn.Sequential(
                             torch.nn.Linear(emb_dim, emb_dim),
                             torch.nn.LeakyReLU(negative_slope = 0.1),
+                            torch.nn.Linear(emb_dim, emb_dim),
+                            torch.nn.LeakyReLU(negative_slope = 0.1)
                         )
                 )
 

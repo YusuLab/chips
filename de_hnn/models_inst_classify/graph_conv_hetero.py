@@ -4,7 +4,7 @@ from torch_geometric.nn import MessagePassing
 import torch.nn.functional as F
 from torch_geometric.nn import global_mean_pool, global_add_pool
 from torch_geometric.utils import degree
-from torch_geometric.nn.conv import GATv2Conv
+from torch_geometric.nn.conv import GATv2Conv, HypergraphConv
 from torch_geometric.nn.conv.pna_conv import PNAConv
 from torch.nn import Sequential as Seq, Linear, ReLU
 from hmpnn_layer import HMPNNLayer
@@ -66,23 +66,23 @@ class HyperConv(MessagePassing):
                        ReLU(),
                        Linear(out_channels, out_channels))
 
-        self.mlp = Seq(Linear(out_channels * 3, out_channels * 2),
+        self.mlp = Seq(Linear(out_channels * 3, out_channels * 3),
                        ReLU(),
-                       Linear(out_channels * 2, out_channels))
+                       Linear(out_channels * 3, out_channels))
 
     def forward(self, x, x_net, net_inst_adj, inst_net_adj_v_drive, inst_net_adj_v_sink):
         
-        h = self.phi(x)
+        h = self.phi(F.dropout(x))
         
         net_agg = torch.mm(net_inst_adj, h) + x_net
         
-        h_drive = torch.mm(inst_net_adj_v_drive, net_agg)
+        h_drive = F.dropout(torch.mm(inst_net_adj_v_drive, net_agg))
         
-        h_sink = self.psi(torch.mm(inst_net_adj_v_sink, net_agg))
+        h_sink = self.psi(F.dropout(torch.mm(inst_net_adj_v_sink, net_agg)))
 
         h = self.mlp(torch.concat([x, h_drive, h_sink], dim=1)) + x
         
-        return h, net_agg  
+        return h, x_net 
 
 class HyperConvNoDir(MessagePassing):
     def __init__(self, out_channels, edge_dim):
@@ -196,11 +196,14 @@ class GNN_node(torch.nn.Module):
             elif gnn_type == "hnhn":
                 self.convs.append(HNHNLayer(
                     in_channels=emb_dim,
-                    hidden_channels=emb_dim,
-                    incidence_1=incidence,
+                    hidden_channels=emb_dim
                 ))
             elif gnn_type == "allset":
                 self.convs.append(AllSetLayer(in_channels=emb_dim, hidden_channels=emb_dim))
+            
+            elif gnn_type == 'sota':
+                self.convs.append(HypergraphConv(in_channels = emb_dim, out_channels = emb_dim, use_attention=True, concat=False))
+            
             else:
                 raise ValueError('Undefined GNN type called {}'.format(gnn_type))
                     
@@ -244,6 +247,9 @@ class GNN_node(torch.nn.Module):
                     h_inst, h_net = self.convs[layer](h_inst, incidence_1=net_inst_adj)
                 elif self.gnn_type == 'allset':
                     h_inst, h_net = self.convs[layer](h_inst, net_inst_adj.T)
+                elif self.gnn_type == 'sota':
+                  h_inst = self.convs[layer](x=h_list[layer][:num_instances], hyperedge_index=net_inst_adj.T._indices(), hyperedge_attr=h_list[layer][num_instances:], num_edges=h_net.size(0)) 
+                  h_net = torch.mm(net_inst_adj, h_inst) 
                 else:
                     h_inst, h_net = self.convs[layer](h_inst, h_net, net_inst_adj, inst_net_adj_v_drive, inst_net_adj_v_sink)
                 
@@ -471,16 +477,15 @@ class GNN_node_Virtualnode(torch.nn.Module):
             ### update the virtual nodes
             if layer < self.num_layer - 1:
                 ### add message from graph nodes to virtual nodes
-                virtualnode_embedding_temp = global_mean_pool(h_list[layer][:num_instances], batch) + virtualnode_embedding
+                virtualnode_embedding_temp = global_mean_pool(F.dropout(h_list[layer][:num_instances]), batch) + virtualnode_embedding
                 ### transform virtual nodes using MLP
-
                 if self.residual:
                     virtualnode_embedding = virtualnode_embedding + self.mlp_virtualnode_list[layer](virtualnode_embedding_temp)
                 else:
                     virtualnode_embedding = self.mlp_virtualnode_list[layer](virtualnode_embedding_temp)
                 
                 if not single:
-                    top_embedding_temp = global_mean_pool(virtualnode_embedding, top_batch) + top_embedding
+                    top_embedding_temp = global_mean_pool(F.dropout(virtualnode_embedding), top_batch) + top_embedding
                     if self.residual:
                         top_embedding = top_embedding + self.top_virtualnode_list[layer](top_embedding_temp)
                     else:

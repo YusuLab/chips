@@ -240,11 +240,11 @@ else:
     num_epoch = args.num_epoch
 
 # Load the model with the best validation
-try:
-    model.load_state_dict(torch.load(model_name))
-except:
-    print("start new model")
-    num_epoch = 1000
+#try:
+#    model.load_state_dict(torch.load(model_name))
+#except:
+#    print("start new model")
+#    num_epoch = 1000
 
 # Train model
 best_mae = 1e9

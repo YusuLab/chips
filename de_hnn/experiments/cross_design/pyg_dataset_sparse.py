@@ -9,7 +9,7 @@ import pickle
 from tqdm import tqdm
 
 class pyg_dataset(Dataset):
-    def __init__(self, data_dir, fold_index, split, target, load_pe = False, num_eigen = 5, load_global_info = True, load_pd = False, design=0, pl=0, graph_rep = 'bipartite', vn=False, net = True, concat = False):
+    def __init__(self, data_dir, fold_index, split, target, load_pe = False, num_eigen = 5, load_global_info = True, load_pd = False, design=19, pl=0, graph_rep = 'bipartite', vn=False, net = True, concat = False):
         super().__init__()
         self.data_dir = data_dir
         self.fold_index = fold_index
@@ -167,7 +167,7 @@ class pyg_dataset(Dataset):
 
             example.cell_degrees = torch.Tensor(d['cell_degrees'])
             example.net_degrees = torch.Tensor(d['net_degrees'])
-            example.x = torch.cat([example.x, example.cell_degrees.unsqueeze(dim = 1)], dim = 1)
+            #example.x = torch.cat([example.x, example.cell_degrees.unsqueeze(dim = 1)], dim = 1)
             
             if (not net) or (not pl):
                 example.x_net = example.net_degrees.unsqueeze(dim = 1)
@@ -235,7 +235,7 @@ class pyg_dataset(Dataset):
             
             # Load persistence diagram and neighbor list
             if self.load_pd == True:
-                file_name = data_dir + '/' + nerighbor_f + str(graph_index) + '.node_neighbor_features.pkl'
+                file_name = data_dir + '/' + nerighbor_f + str(first_index) + '.node_neighbor_features.pkl'
                 f = open(file_name, 'rb')
                 dictionary = pickle.load(f)
                 f.close()
@@ -248,7 +248,7 @@ class pyg_dataset(Dataset):
 
                 example.x = torch.cat([example.x, pd, neighbor_list], dim = 1)
             else:
-                file_name = data_dir + '/' + nerighbor_f + str(graph_index) + '.node_neighbor_features.pkl'
+                file_name = data_dir + '/' + nerighbor_f + str(first_index) + '.node_neighbor_features.pkl'
                 f = open(file_name, 'rb')
                 dictionary = pickle.load(f)
                 f.close()

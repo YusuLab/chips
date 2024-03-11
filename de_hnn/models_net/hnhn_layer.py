@@ -6,7 +6,6 @@ from torch.nn.parameter import Parameter
 
 from conv import Conv
 
-
 class HNHNLayer(torch.nn.Module):
     """Layer of a Hypergraph Networks with Hyperedge Neurons (HNHN).
 
@@ -62,7 +61,6 @@ class HNHNLayer(torch.nn.Module):
         self,
         in_channels,
         hidden_channels,
-        incidence_1 = None,
         use_bias: bool = True,
         use_normalized_incidence: bool = False,
         alpha: float = -1.5,
@@ -76,6 +74,8 @@ class HNHNLayer(torch.nn.Module):
         self.bias_gain = bias_gain
         self.use_normalized_incidence = use_normalized_incidence
         
+        incidence_1 = None
+
         if incidence_1 is not None:
             self.incidence_1 = incidence_1
             self.incidence_1_transpose = incidence_1.transpose(1, 0)

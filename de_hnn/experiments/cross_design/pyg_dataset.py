@@ -27,7 +27,7 @@ class pyg_dataset(Dataset):
         # Read cross-validation
         pl = bool(pl)
         print(f"Placement Information {pl}")
-        file_name = data_dir + f'/9_fold_cross_validation_{design}.pkl'
+        file_name = data_dir + f'/cross_validation/9_fold_cross_validation_{design}.pkl'
         f = open(file_name, 'rb')
         dictionary = pickle.load(f)
         f.close()
@@ -70,11 +70,13 @@ class pyg_dataset(Dataset):
             num_nets = dictionary['num_nets']
             instance_features = torch.Tensor(dictionary['instance_features'])
             
-            if not pl:
-                instance_features = instance_features[:, 2:]
+            print(instance_features.shape)
+            #if not pl:
+            instance_features = instance_features[:, 2:]
             
             net_features = torch.zeros(num_nets, instance_features.size(1))
 
+            print(instance_features.shape)
             # Read learning targets
             file_name = data_dir + '/' + str(sample) + '.targets.pkl'
             f = open(file_name, 'rb')
@@ -118,6 +120,7 @@ class pyg_dataset(Dataset):
             # PyG data
             example = Data()
             example.__num_nodes__ = x.size(0)
+            print(x.shape)
             example.x = x
 
             # Load capacity
@@ -126,7 +129,7 @@ class pyg_dataset(Dataset):
                 capacity = capacity.unsqueeze(dim = 1)
                 norm_cap = (capacity - torch.min(capacity)) / (torch.max(capacity) - torch.min(capacity))
                 capacity_features = torch.cat([capacity, torch.sqrt(capacity), norm_cap, torch.sqrt(norm_cap), torch.square(norm_cap), torch.sin(norm_cap), torch.cos(norm_cap)], dim = 1)
-                example.x = torch.cat([example.x, capacity_features], dim = 1)
+            #example.x = torch.cat([example.x, capacity_features], dim = 1)
 
             example.num_instances = num_instances
 
@@ -211,7 +214,7 @@ class pyg_dataset(Dataset):
                 neighbor_f = 'node_neighbors/'
 
             if self.load_pd == True:
-                file_name = data_dir + '/' + neighbor_f + str(first_index) + '.node_neighbor_features.pkl'
+                file_name = '/home/zluo' + '/' + neighbor_f + str(first_index) + '.node_neighbor_features.pkl'
                 f = open(file_name, 'rb')
                 dictionary = pickle.load(f)
                 f.close()

@@ -23,7 +23,7 @@ class pyg_dataset(Dataset):
 
         # Split
         print(f"Placement Information {pl}")
-        split_data_dir = data_dir + "/split/{split}/"
+        split_data_dir = data_dir + f"/split/{split}/"
         print(split_data_dir)
         file_name = split_data_dir + str(graph_index) + '.split_net.pkl'
         f = open(file_name, 'rb')

@@ -71,7 +71,7 @@ class pyg_dataset(Dataset):
                 #xloc_list = X*(dictionary['x_max'] - dictionary['x_min']) + dictionary['x_min']
                 #yloc_list = Y*(dictionary['y_max'] - dictionary['y_min']) + dictionary['y_min']
                 #instance_features = torch.cat([instance_features[:, 2:], torch.Tensor(xloc_list).unsqueeze(dim = 1), torch.Tensor(yloc_list).unsqueeze(dim = 1)], dim=1) 
-                instance_features = instance_features[:, :2]
+                instance_features = instance_features[:, 2:]
             
             # Read learning targets
             file_name = data_dir + '/' + str(sample) + '.net_demand_capacity.pkl'
@@ -157,7 +157,7 @@ class pyg_dataset(Dataset):
             example.net_degrees = torch.Tensor(d['net_degrees']) 
             example.x = torch.cat([example.x, example.cell_degrees.unsqueeze(dim = 1)], dim = 1)
             
-            if pl:
+            if not pl:
                 example.x_net = example.net_degrees.unsqueeze(dim = 1)
             else:
                 example.x_net = torch.cat([example.x_net, example.net_degrees.unsqueeze(dim = 1)], dim = 1)
@@ -180,13 +180,13 @@ class pyg_dataset(Dataset):
                 example.x = torch.cat([example.x, global_info], dim = 1)
 
             if pl:
-                nerighbor_f = 'node_neighbors_pl/'
+                nerighbor_f = 'node_neighbors/'
             else:
-                nerighbor_f = 'node_neighbors_pl/'
+                nerighbor_f = 'node_neighbors/'
                 
             # Load persistence diagram and neighbor list
             if self.load_pd == True:
-                file_name = data_dir + '/' + nerighbor_f + str(graph_index) + '.node_neighbor_features.pkl'
+                file_name = data_dir + '/' + nerighbor_f + str(first_index) + '.node_neighbor_features.pkl'
                 f = open(file_name, 'rb')
                 dictionary = pickle.load(f)
                 f.close()
@@ -199,7 +199,7 @@ class pyg_dataset(Dataset):
 
                 example.x = torch.cat([example.x, pd, neighbor_list], dim = 1)
             else:
-                file_name = data_dir + '/' + nerighbor_f + str(graph_index) + '.node_neighbor_features.pkl'
+                file_name = data_dir + '/' + nerighbor_f + str(first_index) + '.node_neighbor_features.pkl'
                 f = open(file_name, 'rb')
                 dictionary = pickle.load(f)
                 f.close()

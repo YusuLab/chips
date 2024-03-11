@@ -248,7 +248,7 @@ else:
 # Login to Wandb
 # Train model
 best_mae = 1e9
-patience = 250
+patience = 300
 stop = False
 for epoch in range(num_epoch):
     if stop:
@@ -370,7 +370,7 @@ for epoch in range(num_epoch):
 
     if valid_mae < best_mae:
         best_mae = valid_mae
-        patience = 250
+        patience = 300
         print('Current best MAE updated:', best_mae)
         LOG.write('Current best MAE updated: ' + str(best_mae) + '\n')
         print('Current best MAE (original scale) updated:', best_mae * y_std)

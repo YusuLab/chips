@@ -22,7 +22,7 @@ class pyg_dataset(Dataset):
         
 
         print(f"Placement Information {pl}")
-        split_data_dir = data_dir + "/split/{split}/"
+        split_data_dir = data_dir + f"/split/{split}/"
         print(split_data_dir)
         if net == True:
             file_name = split_data_dir + str(graph_index) + '.split_net.pkl'
@@ -151,7 +151,7 @@ class pyg_dataset(Dataset):
 
 
         if vn:
-            if pl:       
+            if not pl:       
                 file_name = data_dir + '/' + str(first_index) + '.metis_part_dict.pkl'
             else:
                 file_name = data_dir + '/' + str(graph_index) + '.star_part_dict.pkl'
@@ -195,7 +195,7 @@ class pyg_dataset(Dataset):
         example.cell_degrees = torch.tensor(d['cell_degrees'])
         example.net_degrees = torch.tensor(d['net_degrees'])
         
-        example.x = torch.cat([example.x, example.cell_degrees.unsqueeze(dim = 1)], dim = 1)
+        #example.x = torch.cat([example.x, example.cell_degrees.unsqueeze(dim = 1)], dim = 1)
         
         if not pl or not net:
             example.x_net = example.net_degrees.unsqueeze(dim = 1)
@@ -213,7 +213,7 @@ class pyg_dataset(Dataset):
             capacity = capacity.unsqueeze(dim = 1)
             norm_cap = (capacity - torch.min(capacity)) / (torch.max(capacity) - torch.min(capacity))
             capacity_features = torch.cat([capacity, torch.sqrt(capacity), norm_cap, torch.sqrt(norm_cap), torch.square(norm_cap), torch.sin(norm_cap), torch.cos(norm_cap)], dim = 1)
-            example.x = torch.cat([example.x, capacity_features], dim = 1)
+            #example.x = torch.cat([example.x, capacity_features], dim = 1)
 
         # Load positional encoding
         if self.load_pe == True:
