@@ -6,8 +6,9 @@ This is the github repository of The AIStats 2024 paper: "DE-HNN: An effective n
 
 The dependencies are recorded in requirements.txt. You can install the dependencies using pip:
 
-```bash
+```commandline
 pip install -r requirements.txt
+```
 
 ## How to Download Netlist Data
 
