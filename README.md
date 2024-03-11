@@ -1,6 +1,13 @@
 # DE-HNN: An effective neural model for Circuit Netlist representation
 
-This is the github repository for the codes for paper: "DE-HNN: An effective neural model for Circuit Netlist representation"
+This is the github repository of The AIStats 2024 paper: "DE-HNN: An effective neural model for Circuit Netlist representation" by Zhishang Luo, Truong Son Hy, Puoya Tabaghi, Donghyeon Koh, Michael Defferrard, Elahe Rezaei, Ryan Carey, Rhett Davis, Rajeev Jain, Yusu Wang.
+
+## Environment Setup
+
+The dependencies are recorded in requirements.txt. You can install the dependencies using pip:
+
+```bash
+pip install -r requirements.txt
 
 ## How to Download Netlist Data
 
