@@ -10,7 +10,7 @@ mkdir $program
 cd $program
 mkdir $target
 cd ..
-dir=./$program/$target/test/
+dir=./$program/$target/
 
 data_dir=../../data/2023-03-06_data/
 
@@ -18,7 +18,7 @@ num_epoch=500
 batch_size=1
 learning_rate=0.001
 seed=123456789
-n_layers=$1
+n_layers=3
 hidden_dim=64
 
 # Device
@@ -31,11 +31,12 @@ pos_dim=10
 
 # Global information
 load_global_info=1
+
 # Persistence diagram & Neighbor list
 load_pd=$2
 
 # Test mode
-test_mode=1
+test_mode=0
 
 # GNN type
 gnn_type=$3
